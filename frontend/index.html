@@ -18,7 +18,7 @@
     h1 span { color: #60a5fa; }
     .tagline { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
     h2 { font-size: 1.1rem; color: #ccc; margin-bottom: 0.75rem; margin-top: 2rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    input, select {
+    input {
       padding: 0.55rem 0.8rem;
       font-size: 1rem;
       border-radius: 6px;
@@ -43,27 +43,28 @@
       background: #222;
       border: 1px solid #333;
       color: #aaa;
+      font-size: 0.8rem;
+      padding: 0.3rem 0.65rem;
     }
-    button.secondary:hover { background: #2a2a2a; }
+    button.secondary:hover { background: #2a2a2a; color: #e0e0e0; }
     .row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
     .card {
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
       border-radius: 8px;
       padding: 0.75rem 1rem;
-      margin-bottom: 0.5rem;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 1rem;
     }
     .card img { width: 48px; height: 72px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
     .card .no-poster { width: 48px; height: 72px; background: #222; border-radius: 4px; flex-shrink: 0; }
     .card .info { flex: 1; min-width: 0; }
     .card .info strong { display: block; font-size: 1rem; color: #fff; margin-bottom: 0.2rem; }
-    .card .meta { font-size: 0.8rem; color: #666; margin-bottom: 0.3rem; }
-    .card .overview { font-size: 0.85rem; color: #888; line-height: 1.4; }
+    .card .meta { font-size: 0.8rem; color: #666; }
     .card.clickable { cursor: pointer; }
     .card.clickable:hover { border-color: #2563eb; background: #1e1e2e; }
+    .overview { font-size: 0.85rem; color: #888; line-height: 1.4; margin-top: 0.2rem; }
     .badge {
       display: inline-block;
       padding: 0.15rem 0.5rem;
@@ -71,7 +72,6 @@
       font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
     }
     .badge.watching { background: #14532d; color: #86efac; }
     .badge.watchlist { background: #1e3a5f; color: #93c5fd; }
@@ -79,6 +79,76 @@
     #error { color: #f87171; font-size: 0.9rem; min-height: 1.2rem; margin-bottom: 0.5rem; }
     #searchResults { margin-bottom: 1rem; }
     .empty { color: #444; font-style: italic; padding: 1rem 0; }
+
+    /* Show list wrappers */
+    .show-wrap { margin-bottom: 0.5rem; }
+    .show-wrap > .card {
+      border-radius: 8px;
+      margin-bottom: 0;
+      transition: border-radius 0.1s;
+    }
+    .show-wrap > .card.ep-open {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom-color: #111;
+    }
+
+    /* Episode panel */
+    .episode-panel {
+      display: none;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 0.75rem 1rem;
+    }
+    .ep-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .ep-progress { font-size: 0.85rem; color: #888; flex: 1; }
+    .progress-bar {
+      background: #222;
+      border-radius: 3px;
+      height: 3px;
+      overflow: hidden;
+      margin-top: 0.3rem;
+      max-width: 160px;
+    }
+    .progress-bar-fill { background: #2563eb; height: 100%; border-radius: 3px; }
+
+    /* Season blocks */
+    .season-block { margin-bottom: 0.4rem; }
+    .season-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #222;
+      margin-bottom: 0.2rem;
+    }
+    .season-title { font-size: 0.82rem; color: #999; flex: 1; }
+
+    /* Episode rows */
+    .ep-list { max-height: 180px; overflow-y: auto; }
+    .ep-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.2rem;
+      cursor: pointer;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+    .ep-item:hover { background: #1e1e1e; }
+    .ep-check { width: 1rem; text-align: center; color: #444; flex-shrink: 0; font-size: 0.75rem; }
+    .ep-item.watched .ep-check { color: #4ade80; }
+    .ep-label { flex: 1; color: #777; }
+    .ep-item.watched .ep-label { color: #444; text-decoration: line-through; }
+    .ep-date { color: #444; font-size: 0.72rem; flex-shrink: 0; }
 
     /* Status picker modal */
     .modal-overlay {
@@ -114,6 +184,7 @@
     .modal .status-btn:hover { border-color: #60a5fa; background: #1a1a2e; }
     .modal .cancel { color: #666; font-size: 0.85rem; cursor: pointer; }
     .modal .cancel:hover { color: #aaa; }
+    .loading { color: #555; font-size: 0.85rem; font-style: italic; }
   </style>
 </head>
 <body>
@@ -129,7 +200,7 @@
 <div id="error"></div>
 <div id="searchResults"></div>
 
-<h2>My Shows <button class="secondary" style="font-size:0.8rem;padding:0.3rem 0.7rem;margin-left:0.5rem" onclick="loadShows()">Refresh</button></h2>
+<h2>My Shows <button class="secondary" style="margin-left:0.5rem" onclick="loadShows()">Refresh</button></h2>
 <div id="showList"></div>
 
 <!-- Status picker modal -->
@@ -153,6 +224,14 @@
     document.getElementById("error").textContent = msg || "";
   }
 
+  function escHtml(str) {
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+
+  // ── Search ────────────────────────────────────────────────────────────────
+
   async function searchShows() {
     const query = document.getElementById("searchInput").value.trim();
     if (!query) return;
@@ -164,8 +243,7 @@
         body: JSON.stringify({ query }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const results = await res.json();
-      renderSearchResults(results);
+      renderSearchResults(await res.json());
     } catch (e) {
       setError("Search failed: " + e.message);
     }
@@ -173,15 +251,10 @@
 
   function renderSearchResults(results) {
     const el = document.getElementById("searchResults");
-    if (!results.length) {
-      el.innerHTML = '<p class="empty">No results found.</p>';
-      return;
-    }
+    if (!results.length) { el.innerHTML = '<p class="empty">No results found.</p>'; return; }
     el.innerHTML = results.slice(0, 8).map(r => `
-      <div class="card clickable" onclick="openModal(${r.tmdb_id}, ${JSON.stringify(r.title)})">
-        ${r.poster_path
-          ? `<img src="${POSTER_BASE}${r.poster_path}" alt="">`
-          : `<div class="no-poster"></div>`}
+      <div class="card clickable" data-tmdb-id="${r.tmdb_id}" data-title="${escHtml(r.title)}">
+        ${r.poster_path ? `<img src="${POSTER_BASE}${r.poster_path}" alt="">` : `<div class="no-poster"></div>`}
         <div class="info">
           <strong>${escHtml(r.title)}</strong>
           <div class="meta">${r.first_air_date || "Unknown date"}</div>
@@ -190,6 +263,14 @@
       </div>
     `).join("");
   }
+
+  document.getElementById("searchResults").addEventListener("click", e => {
+    const card = e.target.closest(".card.clickable");
+    if (!card) return;
+    openModal(parseInt(card.dataset.tmdbId), card.dataset.title);
+  });
+
+  // ── Add modal ─────────────────────────────────────────────────────────────
 
   function openModal(tmdbId, title) {
     pendingAdd = { tmdbId, title };
@@ -222,12 +303,17 @@
     }
   }
 
+  document.getElementById("modalOverlay").addEventListener("click", e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // ── Show list ─────────────────────────────────────────────────────────────
+
   async function loadShows() {
     try {
       const res = await fetch("/shows");
       if (!res.ok) throw new Error(await res.text());
-      const shows = await res.json();
-      renderShows(shows);
+      renderShows(await res.json());
     } catch (e) {
       setError("Could not load shows: " + e.message);
     }
@@ -240,38 +326,208 @@
       return;
     }
     el.innerHTML = shows.map(s => `
-      <div class="card">
-        ${s.poster_path
-          ? `<img src="${POSTER_BASE}${s.poster_path}" alt="">`
-          : `<div class="no-poster"></div>`}
-        <div class="info">
-          <strong>${escHtml(s.title)}</strong>
-          <div class="meta">
-            <span class="badge ${s.status}">${s.status}</span>
-            &nbsp;${s.type}
-            &nbsp;· added ${s.added_at.slice(0, 10)}
-            ${s.last_watched_at ? `· last watched ${s.last_watched_at.slice(0, 10)}` : ""}
+      <div class="show-wrap">
+        <div class="card" id="show-card-${s.tmdb_id}">
+          ${s.poster_path ? `<img src="${POSTER_BASE}${s.poster_path}" alt="">` : `<div class="no-poster"></div>`}
+          <div class="info">
+            <strong>${escHtml(s.title)}</strong>
+            <div class="meta">
+              <span class="badge ${s.status}">${s.status}</span>
+              &nbsp;${s.type}
+              &nbsp;· added ${s.added_at.slice(0, 10)}
+              ${s.last_watched_at ? `· last watched ${s.last_watched_at.slice(0, 10)}` : ""}
+            </div>
           </div>
+          <button class="secondary" id="ep-btn-${s.tmdb_id}" onclick="toggleEpisodes(${s.tmdb_id})">
+            Episodes ▾
+          </button>
+        </div>
+        <div class="episode-panel" id="ep-panel-${s.tmdb_id}">
+          <p class="loading">Loading episodes…</p>
         </div>
       </div>
     `).join("");
   }
 
-  function escHtml(str) {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // ── Episode panel ─────────────────────────────────────────────────────────
+
+  const _epCache = {};  // tmdbId → episodes array
+
+  async function toggleEpisodes(tmdbId) {
+    const panel = document.getElementById(`ep-panel-${tmdbId}`);
+    const card  = document.getElementById(`show-card-${tmdbId}`);
+    const btn   = document.getElementById(`ep-btn-${tmdbId}`);
+    const open  = panel.style.display === "block";
+
+    if (open) {
+      panel.style.display = "none";
+      card.classList.remove("ep-open");
+      btn.textContent = "Episodes ▾";
+    } else {
+      panel.style.display = "block";
+      card.classList.add("ep-open");
+      btn.textContent = "Episodes ▴";
+      if (!_epCache[tmdbId]) {
+        await loadEpisodes(tmdbId);
+      }
+    }
   }
 
-  // Close modal on overlay click
-  document.getElementById("modalOverlay").addEventListener("click", e => {
-    if (e.target === e.currentTarget) closeModal();
+  async function loadEpisodes(tmdbId) {
+    const panel = document.getElementById(`ep-panel-${tmdbId}`);
+    panel.innerHTML = '<p class="loading">Fetching episodes…</p>';
+    try {
+      const res = await fetch(`/shows/${tmdbId}/episodes`);
+      if (!res.ok) throw new Error(await res.text());
+      const episodes = await res.json();
+      _epCache[tmdbId] = episodes;
+      renderEpisodePanel(tmdbId, episodes);
+    } catch (e) {
+      panel.innerHTML = `<p style="color:#f87171;font-size:0.85rem">Failed: ${escHtml(e.message)}</p>`;
+    }
+  }
+
+  function renderEpisodePanel(tmdbId, episodes) {
+    const panel = document.getElementById(`ep-panel-${tmdbId}`);
+    if (!episodes.length) {
+      panel.innerHTML = '<p class="empty">No episodes found.</p>';
+      return;
+    }
+
+    const total   = episodes.length;
+    const watched = episodes.filter(e => e.watched).length;
+    const pct     = total > 0 ? Math.round(watched / total * 100) : 0;
+
+    // Group by season
+    const seasons = {};
+    for (const ep of episodes) {
+      (seasons[ep.season_number] ??= []).push(ep);
+    }
+
+    let html = `
+      <div class="ep-header">
+        <div class="ep-progress">
+          ${watched}/${total} watched
+          <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+        <button class="secondary" onclick="markShowWatched(${tmdbId})">Mark all watched</button>
+      </div>
+    `;
+
+    for (const [sNum, eps] of Object.entries(seasons)) {
+      const sw = eps.filter(e => e.watched).length;
+      html += `
+        <div class="season-block">
+          <div class="season-header">
+            <span class="season-title">Season ${sNum} &nbsp;·&nbsp; ${sw}/${eps.length}</span>
+            <button class="secondary" onclick="markSeasonWatched(${tmdbId}, ${sNum})">Mark watched</button>
+          </div>
+          <div class="ep-list">
+            ${eps.map(ep => `
+              <div class="ep-item${ep.watched ? " watched" : ""}"
+                   data-show="${tmdbId}" data-season="${ep.season_number}" data-ep="${ep.episode_number}">
+                <span class="ep-check">${ep.watched ? "✓" : "○"}</span>
+                <span class="ep-label">S${pad2(ep.season_number)}E${pad2(ep.episode_number)} ${escHtml(ep.title || "")}</span>
+                ${ep.air_date ? `<span class="ep-date">${ep.air_date}</span>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    panel.innerHTML = html;
+  }
+
+  // Delegate ep-item clicks within #showList
+  document.getElementById("showList").addEventListener("click", e => {
+    const item = e.target.closest(".ep-item");
+    if (!item) return;
+    const { show, season, ep } = item.dataset;
+    toggleEpWatched(item, parseInt(show), parseInt(season), parseInt(ep));
   });
 
-  // Enter key in search box
+  async function toggleEpWatched(item, tmdbId, season, ep) {
+    const nowWatched = !item.classList.contains("watched");
+    try {
+      const res = await fetch("/episodes/watched", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdb_show_id: tmdbId, season_number: season, episode_number: ep, watched: nowWatched }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      // Update in place
+      item.classList.toggle("watched", nowWatched);
+      item.querySelector(".ep-check").textContent = nowWatched ? "✓" : "○";
+
+      // Bust cache so next open reflects reality
+      delete _epCache[tmdbId];
+      _updateSeasonCount(item.closest(".season-block"));
+      _updatePanelProgress(document.getElementById(`ep-panel-${tmdbId}`));
+    } catch (e) {
+      setError("Could not update episode: " + e.message);
+    }
+  }
+
+  function _updateSeasonCount(seasonBlock) {
+    if (!seasonBlock) return;
+    const items = seasonBlock.querySelectorAll(".ep-item");
+    const watched = seasonBlock.querySelectorAll(".ep-item.watched").length;
+    const title = seasonBlock.querySelector(".season-title");
+    if (title) {
+      title.textContent = title.textContent.replace(/\d+\/\d+/, `${watched}/${items.length}`);
+    }
+  }
+
+  function _updatePanelProgress(panel) {
+    if (!panel) return;
+    const items   = panel.querySelectorAll(".ep-item");
+    const watched = panel.querySelectorAll(".ep-item.watched").length;
+    const pct     = items.length > 0 ? Math.round(watched / items.length * 100) : 0;
+    const prog    = panel.querySelector(".ep-progress");
+    if (prog) {
+      prog.innerHTML = `${watched}/${items.length} watched
+        <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
+    }
+  }
+
+  async function markSeasonWatched(tmdbId, season) {
+    try {
+      const res = await fetch("/episodes/watched/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdb_show_id: tmdbId, season_number: season }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      delete _epCache[tmdbId];
+      await loadEpisodes(tmdbId);
+    } catch (e) {
+      setError("Could not mark season watched: " + e.message);
+    }
+  }
+
+  async function markShowWatched(tmdbId) {
+    try {
+      const res = await fetch("/episodes/watched/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdb_show_id: tmdbId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      delete _epCache[tmdbId];
+      await loadEpisodes(tmdbId);
+    } catch (e) {
+      setError("Could not mark show watched: " + e.message);
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
   document.getElementById("searchInput").addEventListener("keydown", e => {
     if (e.key === "Enter") searchShows();
   });
 
-  // Load shows on page open
   loadShows();
 </script>
 </body>

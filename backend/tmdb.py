@@ -50,6 +50,16 @@ async def get_person(tmdb_person_id: int) -> dict:
     return r.json()
 
 
+async def get_season(tmdb_id: int, season_number: int) -> dict:
+    """GET /tv/{tmdb_id}/season/{season_number}"""
+    r = await _client.get(
+        f"/tv/{tmdb_id}/season/{season_number}",
+        params={"api_key": settings.tmdb_api_key},
+    )
+    r.raise_for_status()
+    return r.json()
+
+
 async def get_person_credits(tmdb_person_id: int) -> dict:
     """GET /person/{person_id}/combined_credits — tv + movie in one call"""
     r = await _client.get(
