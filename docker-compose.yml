@@ -1,0 +1,9 @@
+services:
+  whist:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./whist.db:/app/whist.db
+      - ./.env:/app/.env:ro
+    restart: unless-stopped

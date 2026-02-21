@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WHIST — Where Have I Seen Them?</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+      background: #0f0f0f;
+      color: #e0e0e0;
+    }
+    h1 { font-size: 1.8rem; color: #fff; margin-bottom: 0.25rem; }
+    h1 span { color: #60a5fa; }
+    .tagline { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.1rem; color: #ccc; margin-bottom: 0.75rem; margin-top: 2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    input, select {
+      padding: 0.55rem 0.8rem;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      outline: none;
+    }
+    input:focus { border-color: #60a5fa; }
+    button {
+      padding: 0.55rem 1.1rem;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary {
+      background: #222;
+      border: 1px solid #333;
+      color: #aaa;
+    }
+    button.secondary:hover { background: #2a2a2a; }
+    .row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .card img { width: 48px; height: 72px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+    .card .no-poster { width: 48px; height: 72px; background: #222; border-radius: 4px; flex-shrink: 0; }
+    .card .info { flex: 1; min-width: 0; }
+    .card .info strong { display: block; font-size: 1rem; color: #fff; margin-bottom: 0.2rem; }
+    .card .meta { font-size: 0.8rem; color: #666; margin-bottom: 0.3rem; }
+    .card .overview { font-size: 0.85rem; color: #888; line-height: 1.4; }
+    .card.clickable { cursor: pointer; }
+    .card.clickable:hover { border-color: #2563eb; background: #1e1e2e; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .badge.watching { background: #14532d; color: #86efac; }
+    .badge.watchlist { background: #1e3a5f; color: #93c5fd; }
+    .badge.finished { background: #2d1b4e; color: #c4b5fd; }
+    #error { color: #f87171; font-size: 0.9rem; min-height: 1.2rem; margin-bottom: 0.5rem; }
+    #searchResults { margin-bottom: 1rem; }
+    .empty { color: #444; font-style: italic; padding: 1rem 0; }
+
+    /* Status picker modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 1.5rem;
+      min-width: 300px;
+      max-width: 90vw;
+    }
+    .modal h3 { color: #fff; margin-bottom: 1rem; font-size: 1rem; }
+    .modal .status-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+    .modal .status-btn {
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #111;
+      color: #e0e0e0;
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.95rem;
+      transition: border-color 0.15s;
+    }
+    .modal .status-btn:hover { border-color: #60a5fa; background: #1a1a2e; }
+    .modal .cancel { color: #666; font-size: 0.85rem; cursor: pointer; }
+    .modal .cancel:hover { color: #aaa; }
+  </style>
+</head>
+<body>
+
+<h1>WHIST <span>//</span> Where Have I Seen Them?</h1>
+<p class="tagline">Track what you watch. Find familiar faces instantly.</p>
+
+<h2>Search &amp; Add Show</h2>
+<div class="row">
+  <input type="text" id="searchInput" placeholder="Search for a TV show…" style="flex:1">
+  <button onclick="searchShows()">Search</button>
+</div>
+<div id="error"></div>
+<div id="searchResults"></div>
+
+<h2>My Shows <button class="secondary" style="font-size:0.8rem;padding:0.3rem 0.7rem;margin-left:0.5rem" onclick="loadShows()">Refresh</button></h2>
+<div id="showList"></div>
+
+<!-- Status picker modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Add show as…</h3>
+    <div class="status-options">
+      <button class="status-btn" onclick="confirmAdd('watching')">Watching</button>
+      <button class="status-btn" onclick="confirmAdd('watchlist')">Add to Watchlist</button>
+      <button class="status-btn" onclick="confirmAdd('finished')">Already Finished</button>
+    </div>
+    <span class="cancel" onclick="closeModal()">Cancel</span>
+  </div>
+</div>
+
+<script>
+  const POSTER_BASE = "https://image.tmdb.org/t/p/w92";
+  let pendingAdd = null;
+
+  function setError(msg) {
+    document.getElementById("error").textContent = msg || "";
+  }
+
+  async function searchShows() {
+    const query = document.getElementById("searchInput").value.trim();
+    if (!query) return;
+    setError("");
+    try {
+      const res = await fetch("/shows/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const results = await res.json();
+      renderSearchResults(results);
+    } catch (e) {
+      setError("Search failed: " + e.message);
+    }
+  }
+
+  function renderSearchResults(results) {
+    const el = document.getElementById("searchResults");
+    if (!results.length) {
+      el.innerHTML = '<p class="empty">No results found.</p>';
+      return;
+    }
+    el.innerHTML = results.slice(0, 8).map(r => `
+      <div class="card clickable" onclick="openModal(${r.tmdb_id}, ${JSON.stringify(r.title)})">
+        ${r.poster_path
+          ? `<img src="${POSTER_BASE}${r.poster_path}" alt="">`
+          : `<div class="no-poster"></div>`}
+        <div class="info">
+          <strong>${escHtml(r.title)}</strong>
+          <div class="meta">${r.first_air_date || "Unknown date"}</div>
+          ${r.overview ? `<div class="overview">${escHtml(r.overview.slice(0, 120))}…</div>` : ""}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function openModal(tmdbId, title) {
+    pendingAdd = { tmdbId, title };
+    document.getElementById("modalTitle").textContent = `Add "${title}" as…`;
+    document.getElementById("modalOverlay").classList.add("open");
+  }
+
+  function closeModal() {
+    pendingAdd = null;
+    document.getElementById("modalOverlay").classList.remove("open");
+  }
+
+  async function confirmAdd(status) {
+    if (!pendingAdd) return;
+    const { tmdbId } = pendingAdd;
+    closeModal();
+    setError("");
+    try {
+      const res = await fetch("/shows/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdb_id: tmdbId, status, type: "tv" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      document.getElementById("searchResults").innerHTML = "";
+      document.getElementById("searchInput").value = "";
+      loadShows();
+    } catch (e) {
+      setError("Could not add show: " + e.message);
+    }
+  }
+
+  async function loadShows() {
+    try {
+      const res = await fetch("/shows");
+      if (!res.ok) throw new Error(await res.text());
+      const shows = await res.json();
+      renderShows(shows);
+    } catch (e) {
+      setError("Could not load shows: " + e.message);
+    }
+  }
+
+  function renderShows(shows) {
+    const el = document.getElementById("showList");
+    if (!shows.length) {
+      el.innerHTML = '<p class="empty">No shows tracked yet. Search above to add one.</p>';
+      return;
+    }
+    el.innerHTML = shows.map(s => `
+      <div class="card">
+        ${s.poster_path
+          ? `<img src="${POSTER_BASE}${s.poster_path}" alt="">`
+          : `<div class="no-poster"></div>`}
+        <div class="info">
+          <strong>${escHtml(s.title)}</strong>
+          <div class="meta">
+            <span class="badge ${s.status}">${s.status}</span>
+            &nbsp;${s.type}
+            &nbsp;· added ${s.added_at.slice(0, 10)}
+            ${s.last_watched_at ? `· last watched ${s.last_watched_at.slice(0, 10)}` : ""}
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // Close modal on overlay click
+  document.getElementById("modalOverlay").addEventListener("click", e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // Enter key in search box
+  document.getElementById("searchInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") searchShows();
+  });
+
+  // Load shows on page open
+  loadShows();
+</script>
+</body>
+</html>
