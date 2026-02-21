@@ -8,7 +8,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: system-ui, sans-serif;
-      max-width: 860px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 1.5rem 2rem;
       background: #0f0f0f;
@@ -19,43 +19,24 @@
     .tagline { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
     h2 { font-size: 1.1rem; color: #ccc; margin-bottom: 0.75rem; margin-top: 2rem; text-transform: uppercase; letter-spacing: 0.05em; }
     input {
-      padding: 0.55rem 0.8rem;
-      font-size: 1rem;
-      border-radius: 6px;
-      border: 1px solid #333;
-      background: #1a1a1a;
-      color: #e0e0e0;
-      outline: none;
+      padding: 0.55rem 0.8rem; font-size: 1rem; border-radius: 6px;
+      border: 1px solid #333; background: #1a1a1a; color: #e0e0e0; outline: none;
     }
     input:focus { border-color: #60a5fa; }
     button {
-      padding: 0.55rem 1.1rem;
-      font-size: 1rem;
-      border-radius: 6px;
-      border: none;
-      background: #2563eb;
-      color: white;
-      cursor: pointer;
-      transition: background 0.15s;
+      padding: 0.55rem 1.1rem; font-size: 1rem; border-radius: 6px;
+      border: none; background: #2563eb; color: white; cursor: pointer; transition: background 0.15s;
     }
     button:hover { background: #1d4ed8; }
     button.secondary {
-      background: #222;
-      border: 1px solid #333;
-      color: #aaa;
-      font-size: 0.8rem;
-      padding: 0.3rem 0.65rem;
+      background: #222; border: 1px solid #333; color: #aaa;
+      font-size: 0.8rem; padding: 0.3rem 0.65rem;
     }
     button.secondary:hover { background: #2a2a2a; color: #e0e0e0; }
     .row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
     .card {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
+      padding: 0.75rem 1rem; display: flex; align-items: center; gap: 1rem;
     }
     .card img { width: 48px; height: 72px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
     .card .no-poster { width: 48px; height: 72px; background: #222; border-radius: 4px; flex-shrink: 0; }
@@ -66,12 +47,8 @@
     .card.clickable:hover { border-color: #2563eb; background: #1e1e2e; }
     .overview { font-size: 0.85rem; color: #888; line-height: 1.4; margin-top: 0.2rem; }
     .badge {
-      display: inline-block;
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
+      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px;
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
     }
     .badge.watching { background: #14532d; color: #86efac; }
     .badge.watchlist { background: #1e3a5f; color: #93c5fd; }
@@ -79,70 +56,34 @@
     #error { color: #f87171; font-size: 0.9rem; min-height: 1.2rem; margin-bottom: 0.5rem; }
     #searchResults { margin-bottom: 1rem; }
     .empty { color: #444; font-style: italic; padding: 1rem 0; }
+    .loading { color: #555; font-size: 0.85rem; font-style: italic; }
 
-    /* Show list wrappers */
+    /* Show list */
     .show-wrap { margin-bottom: 0.5rem; }
-    .show-wrap > .card {
-      border-radius: 8px;
-      margin-bottom: 0;
-      transition: border-radius 0.1s;
+    .show-wrap > .card { border-radius: 8px; margin-bottom: 0; }
+    .show-wrap > .card.panel-open {
+      border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: #111;
     }
-    .show-wrap > .card.ep-open {
-      border-bottom-left-radius: 0;
-      border-bottom-right-radius: 0;
-      border-bottom-color: #111;
-    }
+    .card-buttons { display: flex; gap: 0.4rem; flex-shrink: 0; }
 
-    /* Episode panel */
-    .episode-panel {
-      display: none;
-      background: #141414;
-      border: 1px solid #2a2a2a;
-      border-top: none;
-      border-radius: 0 0 8px 8px;
-      padding: 0.75rem 1rem;
+    /* Shared panel base */
+    .sub-panel {
+      background: #141414; border: 1px solid #2a2a2a; border-top: none;
+      border-radius: 0 0 8px 8px; padding: 0.75rem 1rem;
     }
-    .ep-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
-      flex-wrap: wrap;
-    }
+    .sub-panel + .sub-panel { border-top: 1px solid #1e1e1e; border-radius: 0; }
+    .sub-panel:last-child { border-radius: 0 0 8px 8px; }
+
+    /* ── Episode panel ───────────────────────────────── */
+    .ep-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
     .ep-progress { font-size: 0.85rem; color: #888; flex: 1; }
-    .progress-bar {
-      background: #222;
-      border-radius: 3px;
-      height: 3px;
-      overflow: hidden;
-      margin-top: 0.3rem;
-      max-width: 160px;
-    }
+    .progress-bar { background: #222; border-radius: 3px; height: 3px; overflow: hidden; margin-top: 0.3rem; max-width: 160px; }
     .progress-bar-fill { background: #2563eb; height: 100%; border-radius: 3px; }
-
-    /* Season blocks */
     .season-block { margin-bottom: 0.4rem; }
-    .season-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.35rem 0;
-      border-bottom: 1px solid #222;
-      margin-bottom: 0.2rem;
-    }
+    .season-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid #222; margin-bottom: 0.2rem; }
     .season-title { font-size: 0.82rem; color: #999; flex: 1; }
-
-    /* Episode rows */
     .ep-list { max-height: 180px; overflow-y: auto; }
-    .ep-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.25rem 0.2rem;
-      cursor: pointer;
-      border-radius: 3px;
-      font-size: 0.8rem;
-    }
+    .ep-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.2rem; cursor: pointer; border-radius: 3px; font-size: 0.8rem; }
     .ep-item:hover { background: #1e1e1e; }
     .ep-check { width: 1rem; text-align: center; color: #444; flex-shrink: 0; font-size: 0.75rem; }
     .ep-item.watched .ep-check { color: #4ade80; }
@@ -150,41 +91,70 @@
     .ep-item.watched .ep-label { color: #444; text-decoration: line-through; }
     .ep-date { color: #444; font-size: 0.72rem; flex-shrink: 0; }
 
-    /* Status picker modal */
+    /* ── Cast panel ──────────────────────────────────── */
+    .cast-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 0.5rem;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .actor-card {
+      text-align: center; cursor: pointer; padding: 0.4rem 0.3rem;
+      border-radius: 6px; border: 1px solid transparent; transition: border-color 0.15s, background 0.15s;
+    }
+    .actor-card:hover { background: #1e1e2e; border-color: #2563eb; }
+    .actor-photo {
+      width: 56px; height: 84px; object-fit: cover; border-radius: 4px;
+      background: #222; display: block; margin: 0 auto 0.3rem;
+    }
+    .actor-name { font-size: 0.7rem; color: #ccc; line-height: 1.2; }
+    .actor-char { font-size: 0.62rem; color: #555; margin-top: 0.1rem; }
+
+    /* Seen-in view */
+    .seen-in-view { animation: fadeIn 0.15s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .seen-in-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .seen-in-header .person-photo {
+      width: 52px; height: 78px; object-fit: cover; border-radius: 4px;
+      background: #222; flex-shrink: 0;
+    }
+    .seen-in-header .person-info strong { display: block; color: #fff; font-size: 1rem; }
+    .seen-in-header .person-info span { font-size: 0.82rem; color: #666; }
+    .seen-in-empty { color: #555; font-size: 0.85rem; font-style: italic; margin-top: 0.25rem; }
+    .seen-in-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.5rem 0; border-bottom: 1px solid #1e1e1e;
+    }
+    .seen-in-item:last-child { border-bottom: none; }
+    .seen-in-poster {
+      width: 36px; height: 54px; object-fit: cover; border-radius: 3px;
+      background: #222; flex-shrink: 0;
+    }
+    .seen-in-item .credit-info { flex: 1; min-width: 0; }
+    .seen-in-item .credit-title { font-size: 0.9rem; color: #e0e0e0; font-weight: 600; }
+    .seen-in-item .credit-char { font-size: 0.8rem; color: #777; margin-top: 0.1rem; }
+    .credit-type-badge {
+      font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px;
+      background: #222; color: #666; text-transform: uppercase; flex-shrink: 0;
+    }
+
+    /* Add modal */
     .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center;
     }
     .modal-overlay.open { display: flex; }
-    .modal {
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 10px;
-      padding: 1.5rem;
-      min-width: 300px;
-      max-width: 90vw;
-    }
+    .modal { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 1.5rem; min-width: 300px; max-width: 90vw; }
     .modal h3 { color: #fff; margin-bottom: 1rem; font-size: 1rem; }
     .modal .status-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
     .modal .status-btn {
-      padding: 0.6rem 1rem;
-      border-radius: 6px;
-      border: 1px solid #333;
-      background: #111;
-      color: #e0e0e0;
-      cursor: pointer;
-      text-align: left;
-      font-size: 0.95rem;
-      transition: border-color 0.15s;
+      padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #333;
+      background: #111; color: #e0e0e0; cursor: pointer; text-align: left; font-size: 0.95rem; transition: border-color 0.15s;
     }
     .modal .status-btn:hover { border-color: #60a5fa; background: #1a1a2e; }
     .modal .cancel { color: #666; font-size: 0.85rem; cursor: pointer; }
     .modal .cancel:hover { color: #aaa; }
-    .loading { color: #555; font-size: 0.85rem; font-style: italic; }
   </style>
 </head>
 <body>
@@ -203,7 +173,7 @@
 <h2>My Shows <button class="secondary" style="margin-left:0.5rem" onclick="loadShows()">Refresh</button></h2>
 <div id="showList"></div>
 
-<!-- Status picker modal -->
+<!-- Add show modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">Add show as…</h3>
@@ -217,17 +187,14 @@
 </div>
 
 <script>
-  const POSTER_BASE = "https://image.tmdb.org/t/p/w92";
+  const POSTER_BASE  = "https://image.tmdb.org/t/p/w92";
+  const PROFILE_BASE = "https://image.tmdb.org/t/p/w185";
   let pendingAdd = null;
 
-  function setError(msg) {
-    document.getElementById("error").textContent = msg || "";
+  function setError(msg) { document.getElementById("error").textContent = msg || ""; }
+  function escHtml(s) {
+    return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
-
-  function escHtml(str) {
-    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-
   function pad2(n) { return String(n).padStart(2, "0"); }
 
   // ── Search ────────────────────────────────────────────────────────────────
@@ -238,15 +205,12 @@
     setError("");
     try {
       const res = await fetch("/shows/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
       });
       if (!res.ok) throw new Error(await res.text());
       renderSearchResults(await res.json());
-    } catch (e) {
-      setError("Search failed: " + e.message);
-    }
+    } catch (e) { setError("Search failed: " + e.message); }
   }
 
   function renderSearchResults(results) {
@@ -266,8 +230,7 @@
 
   document.getElementById("searchResults").addEventListener("click", e => {
     const card = e.target.closest(".card.clickable");
-    if (!card) return;
-    openModal(parseInt(card.dataset.tmdbId), card.dataset.title);
+    if (card) openModal(parseInt(card.dataset.tmdbId), card.dataset.title);
   });
 
   // ── Add modal ─────────────────────────────────────────────────────────────
@@ -277,32 +240,25 @@
     document.getElementById("modalTitle").textContent = `Add "${title}" as…`;
     document.getElementById("modalOverlay").classList.add("open");
   }
-
   function closeModal() {
     pendingAdd = null;
     document.getElementById("modalOverlay").classList.remove("open");
   }
-
   async function confirmAdd(status) {
     if (!pendingAdd) return;
     const { tmdbId } = pendingAdd;
-    closeModal();
-    setError("");
+    closeModal(); setError("");
     try {
       const res = await fetch("/shows/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tmdb_id: tmdbId, status, type: "tv" }),
       });
       if (!res.ok) throw new Error(await res.text());
       document.getElementById("searchResults").innerHTML = "";
       document.getElementById("searchInput").value = "";
       loadShows();
-    } catch (e) {
-      setError("Could not add show: " + e.message);
-    }
+    } catch (e) { setError("Could not add show: " + e.message); }
   }
-
   document.getElementById("modalOverlay").addEventListener("click", e => {
     if (e.target === e.currentTarget) closeModal();
   });
@@ -314,9 +270,7 @@
       const res = await fetch("/shows");
       if (!res.ok) throw new Error(await res.text());
       renderShows(await res.json());
-    } catch (e) {
-      setError("Could not load shows: " + e.message);
-    }
+    } catch (e) { setError("Could not load shows: " + e.message); }
   }
 
   function renderShows(shows) {
@@ -333,45 +287,52 @@
             <strong>${escHtml(s.title)}</strong>
             <div class="meta">
               <span class="badge ${s.status}">${s.status}</span>
-              &nbsp;${s.type}
-              &nbsp;· added ${s.added_at.slice(0, 10)}
-              ${s.last_watched_at ? `· last watched ${s.last_watched_at.slice(0, 10)}` : ""}
+              &nbsp;${s.type} &nbsp;· added ${s.added_at.slice(0,10)}
+              ${s.last_watched_at ? `· last watched ${s.last_watched_at.slice(0,10)}` : ""}
             </div>
           </div>
-          <button class="secondary" id="ep-btn-${s.tmdb_id}" onclick="toggleEpisodes(${s.tmdb_id})">
-            Episodes ▾
-          </button>
+          <div class="card-buttons">
+            <button class="secondary" id="ep-btn-${s.tmdb_id}" onclick="togglePanel('ep',${s.tmdb_id})">Episodes ▾</button>
+            <button class="secondary" id="cast-btn-${s.tmdb_id}" onclick="togglePanel('cast',${s.tmdb_id})">Cast ▾</button>
+          </div>
         </div>
-        <div class="episode-panel" id="ep-panel-${s.tmdb_id}">
+        <div class="sub-panel" id="ep-panel-${s.tmdb_id}" style="display:none">
           <p class="loading">Loading episodes…</p>
+        </div>
+        <div class="sub-panel" id="cast-panel-${s.tmdb_id}" style="display:none">
+          <p class="loading">Loading cast…</p>
         </div>
       </div>
     `).join("");
   }
 
-  // ── Episode panel ─────────────────────────────────────────────────────────
+  // ── Generic panel toggle ──────────────────────────────────────────────────
 
-  const _epCache = {};  // tmdbId → episodes array
-
-  async function toggleEpisodes(tmdbId) {
-    const panel = document.getElementById(`ep-panel-${tmdbId}`);
+  function togglePanel(type, tmdbId) {
+    const panel = document.getElementById(`${type}-panel-${tmdbId}`);
+    const btn   = document.getElementById(`${type}-btn-${tmdbId}`);
     const card  = document.getElementById(`show-card-${tmdbId}`);
-    const btn   = document.getElementById(`ep-btn-${tmdbId}`);
+    const label = type === "ep" ? "Episodes" : "Cast";
     const open  = panel.style.display === "block";
 
     if (open) {
       panel.style.display = "none";
-      card.classList.remove("ep-open");
-      btn.textContent = "Episodes ▾";
+      btn.textContent = `${label} ▾`;
+      // Remove panel-open only if both panels are closed
+      const other = document.getElementById(`${type === "ep" ? "cast" : "ep"}-panel-${tmdbId}`);
+      if (other.style.display === "none") card.classList.remove("panel-open");
     } else {
       panel.style.display = "block";
-      card.classList.add("ep-open");
-      btn.textContent = "Episodes ▴";
-      if (!_epCache[tmdbId]) {
-        await loadEpisodes(tmdbId);
-      }
+      btn.textContent = `${label} ▴`;
+      card.classList.add("panel-open");
+      if (type === "ep" && !_epCache[tmdbId]) loadEpisodes(tmdbId);
+      if (type === "cast" && !_castCache[tmdbId]) loadCast(tmdbId);
     }
   }
+
+  // ── Episode panel ─────────────────────────────────────────────────────────
+
+  const _epCache = {};
 
   async function loadEpisodes(tmdbId) {
     const panel = document.getElementById(`ep-panel-${tmdbId}`);
@@ -383,26 +344,20 @@
       _epCache[tmdbId] = episodes;
       renderEpisodePanel(tmdbId, episodes);
     } catch (e) {
-      panel.innerHTML = `<p style="color:#f87171;font-size:0.85rem">Failed: ${escHtml(e.message)}</p>`;
+      panel.innerHTML = `<p style="color:#f87171;font-size:.85rem">Failed: ${escHtml(e.message)}</p>`;
     }
   }
 
   function renderEpisodePanel(tmdbId, episodes) {
     const panel = document.getElementById(`ep-panel-${tmdbId}`);
-    if (!episodes.length) {
-      panel.innerHTML = '<p class="empty">No episodes found.</p>';
-      return;
-    }
+    if (!episodes.length) { panel.innerHTML = '<p class="empty">No episodes found.</p>'; return; }
 
     const total   = episodes.length;
     const watched = episodes.filter(e => e.watched).length;
-    const pct     = total > 0 ? Math.round(watched / total * 100) : 0;
+    const pct     = total ? Math.round(watched / total * 100) : 0;
 
-    // Group by season
     const seasons = {};
-    for (const ep of episodes) {
-      (seasons[ep.season_number] ??= []).push(ep);
-    }
+    for (const ep of episodes) (seasons[ep.season_number] ??= []).push(ep);
 
     let html = `
       <div class="ep-header">
@@ -435,11 +390,9 @@
         </div>
       `;
     }
-
     panel.innerHTML = html;
   }
 
-  // Delegate ep-item clicks within #showList
   document.getElementById("showList").addEventListener("click", e => {
     const item = e.target.closest(".ep-item");
     if (!item) return;
@@ -451,75 +404,153 @@
     const nowWatched = !item.classList.contains("watched");
     try {
       const res = await fetch("/episodes/watched", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tmdb_show_id: tmdbId, season_number: season, episode_number: ep, watched: nowWatched }),
       });
       if (!res.ok) throw new Error(await res.text());
-
-      // Update in place
       item.classList.toggle("watched", nowWatched);
       item.querySelector(".ep-check").textContent = nowWatched ? "✓" : "○";
-
-      // Bust cache so next open reflects reality
       delete _epCache[tmdbId];
       _updateSeasonCount(item.closest(".season-block"));
       _updatePanelProgress(document.getElementById(`ep-panel-${tmdbId}`));
-    } catch (e) {
-      setError("Could not update episode: " + e.message);
-    }
+    } catch (e) { setError("Could not update episode: " + e.message); }
   }
 
-  function _updateSeasonCount(seasonBlock) {
-    if (!seasonBlock) return;
-    const items = seasonBlock.querySelectorAll(".ep-item");
-    const watched = seasonBlock.querySelectorAll(".ep-item.watched").length;
-    const title = seasonBlock.querySelector(".season-title");
-    if (title) {
-      title.textContent = title.textContent.replace(/\d+\/\d+/, `${watched}/${items.length}`);
-    }
+  function _updateSeasonCount(block) {
+    if (!block) return;
+    const all = block.querySelectorAll(".ep-item").length;
+    const w   = block.querySelectorAll(".ep-item.watched").length;
+    const t   = block.querySelector(".season-title");
+    if (t) t.textContent = t.textContent.replace(/\d+\/\d+/, `${w}/${all}`);
   }
-
   function _updatePanelProgress(panel) {
     if (!panel) return;
-    const items   = panel.querySelectorAll(".ep-item");
-    const watched = panel.querySelectorAll(".ep-item.watched").length;
-    const pct     = items.length > 0 ? Math.round(watched / items.length * 100) : 0;
-    const prog    = panel.querySelector(".ep-progress");
-    if (prog) {
-      prog.innerHTML = `${watched}/${items.length} watched
-        <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
-    }
+    const all = panel.querySelectorAll(".ep-item").length;
+    const w   = panel.querySelectorAll(".ep-item.watched").length;
+    const pct = all ? Math.round(w / all * 100) : 0;
+    const prog = panel.querySelector(".ep-progress");
+    if (prog) prog.innerHTML = `${w}/${all} watched
+      <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
   }
 
   async function markSeasonWatched(tmdbId, season) {
     try {
       const res = await fetch("/episodes/watched/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tmdb_show_id: tmdbId, season_number: season }),
       });
       if (!res.ok) throw new Error(await res.text());
       delete _epCache[tmdbId];
       await loadEpisodes(tmdbId);
-    } catch (e) {
-      setError("Could not mark season watched: " + e.message);
-    }
+    } catch (e) { setError("Could not mark season watched: " + e.message); }
   }
 
   async function markShowWatched(tmdbId) {
     try {
       const res = await fetch("/episodes/watched/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tmdb_show_id: tmdbId }),
       });
       if (!res.ok) throw new Error(await res.text());
       delete _epCache[tmdbId];
       await loadEpisodes(tmdbId);
+    } catch (e) { setError("Could not mark show watched: " + e.message); }
+  }
+
+  // ── Cast panel ────────────────────────────────────────────────────────────
+
+  const _castCache = {};
+
+  async function loadCast(tmdbId) {
+    const panel = document.getElementById(`cast-panel-${tmdbId}`);
+    panel.innerHTML = '<p class="loading">Fetching cast…</p>';
+    try {
+      const res = await fetch(`/shows/${tmdbId}/cast`);
+      if (!res.ok) throw new Error(await res.text());
+      const cast = await res.json();
+      _castCache[tmdbId] = cast;
+      renderCastGrid(tmdbId, cast);
     } catch (e) {
-      setError("Could not mark show watched: " + e.message);
+      panel.innerHTML = `<p style="color:#f87171;font-size:.85rem">Failed: ${escHtml(e.message)}</p>`;
     }
+  }
+
+  function renderCastGrid(tmdbId, cast) {
+    const panel = document.getElementById(`cast-panel-${tmdbId}`);
+    if (!cast.length) { panel.innerHTML = '<p class="empty">No cast found.</p>'; return; }
+
+    panel.innerHTML = `
+      <div class="cast-grid" id="cast-grid-${tmdbId}">
+        ${cast.slice(0, 40).map(p => `
+          <div class="actor-card" data-show="${tmdbId}" data-person="${p.person_tmdb_id}">
+            ${p.profile_path
+              ? `<img class="actor-photo" src="${PROFILE_BASE}${p.profile_path}" alt="" loading="lazy">`
+              : `<div class="actor-photo"></div>`}
+            <div class="actor-name">${escHtml(p.name)}</div>
+            ${p.character ? `<div class="actor-char">${escHtml(p.character)}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  // Delegate actor card clicks
+  document.getElementById("showList").addEventListener("click", e => {
+    const card = e.target.closest(".actor-card");
+    if (!card) return;
+    showSeenIn(parseInt(card.dataset.show), parseInt(card.dataset.person));
+  });
+
+  async function showSeenIn(tmdbId, personId) {
+    const panel = document.getElementById(`cast-panel-${tmdbId}`);
+    panel.innerHTML = '<p class="loading">Looking up watch history…</p>';
+    try {
+      const res = await fetch(`/people/${personId}/seen-in`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      renderSeenIn(tmdbId, data);
+    } catch (e) {
+      panel.innerHTML = `
+        <button class="secondary" onclick="renderCastGrid(${tmdbId}, _castCache[${tmdbId}])" style="margin-bottom:.75rem">← Back to cast</button>
+        <p style="color:#f87171;font-size:.85rem">Failed: ${escHtml(e.message)}</p>
+      `;
+    }
+  }
+
+  function renderSeenIn(tmdbId, data) {
+    const panel = document.getElementById(`cast-panel-${tmdbId}`);
+    const { person, seen_in } = data;
+
+    const creditsHtml = seen_in.length
+      ? seen_in.map(c => `
+          <div class="seen-in-item">
+            ${c.poster_path
+              ? `<img class="seen-in-poster" src="${POSTER_BASE}${c.poster_path}" alt="" loading="lazy">`
+              : `<div class="seen-in-poster"></div>`}
+            <div class="credit-info">
+              <div class="credit-title">${escHtml(c.title)}</div>
+              ${c.character ? `<div class="credit-char">as ${escHtml(c.character)}</div>` : ""}
+            </div>
+            <span class="credit-type-badge">${c.type}</span>
+          </div>
+        `).join("")
+      : `<p class="seen-in-empty">No overlap in your watch history yet.</p>`;
+
+    panel.innerHTML = `
+      <div class="seen-in-view">
+        <button class="secondary" onclick="renderCastGrid(${tmdbId}, _castCache[${tmdbId}])" style="margin-bottom:.75rem">← Back to cast</button>
+        <div class="seen-in-header">
+          ${person.profile_path
+            ? `<img class="person-photo" src="${PROFILE_BASE}${person.profile_path}" alt="">`
+            : `<div class="person-photo"></div>`}
+          <div class="person-info">
+            <strong>${escHtml(person.name)}</strong>
+            <span>${seen_in.length} show${seen_in.length !== 1 ? "s" : ""} in your history</span>
+          </div>
+        </div>
+        ${creditsHtml}
+      </div>
+    `;
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
