@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -85,6 +85,63 @@ async def get_show_episodes(tmdb_show_id: int, db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/shows/{tmdb_show_id}/season/{season_number}")
+async def get_season_detail(
+    tmdb_show_id: int, season_number: int, db: Session = Depends(get_db)
+):
+    """
+    Season detail: TMDB metadata + episode list with local watch state.
+    Requires the show to be tracked.
+    """
+    show = db.execute(
+        select(models.Show).where(models.Show.tmdb_id == tmdb_show_id)
+    ).scalar_one_or_none()
+    if not show:
+        raise HTTPException(status_code=404, detail="Show not tracked")
+
+    await _ensure_episodes_cached(show, db)
+
+    try:
+        season_data = await tmdb.get_season(tmdb_show_id, season_number)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to fetch season from TMDB")
+
+    # Merge TMDB episode metadata with local watch state
+    episodes_db = {
+        ep.episode_number: ep
+        for ep in db.execute(
+            select(models.Episode).where(
+                models.Episode.tmdb_show_id == tmdb_show_id,
+                models.Episode.season_number == season_number,
+            )
+        ).scalars().all()
+    }
+
+    episodes = []
+    for ep in season_data.get("episodes", []):
+        ep_num = ep.get("episode_number")
+        local = episodes_db.get(ep_num)
+        episodes.append({
+            "episode_number": ep_num,
+            "title": ep.get("name"),
+            "air_date": ep.get("air_date"),
+            "overview": ep.get("overview"),
+            "still_path": ep.get("still_path"),
+            "watched": local.watched if local else False,
+            "watched_at": local.watched_at if local else None,
+        })
+
+    return {
+        "tmdb_show_id": tmdb_show_id,
+        "season_number": season_number,
+        "name": season_data.get("name"),
+        "poster_path": season_data.get("poster_path"),
+        "overview": season_data.get("overview"),
+        "air_date": (season_data.get("air_date") or "")[:4],
+        "episodes": episodes,
+    }
+
+
 @router.get("/shows/{tmdb_show_id}/progress")
 async def get_show_progress(tmdb_show_id: int, db: Session = Depends(get_db)):
     """Get watch progress summary for a show."""
@@ -131,16 +188,29 @@ async def get_show_progress(tmdb_show_id: int, db: Session = Depends(get_db)):
 
 # --- Schemas ---
 
+def _today() -> str:
+    return date.today().isoformat()
+
+
 class WatchedRequest(BaseModel):
     tmdb_show_id: int
     season_number: int
     episode_number: int
-    watched: bool = True  # False to unwatch
+    watched: bool = True            # False to unwatch
+    watched_at: str | None = "today"  # "today" | YYYY-MM-DD | null (no date)
 
 
 class BulkWatchedRequest(BaseModel):
     tmdb_show_id: int
     season_number: int | None = None  # None = entire show
+    watched_at: str | None = "today"  # "today" | YYYY-MM-DD | null (no date)
+
+
+def _resolve_date(watched_at: str | None) -> str | None:
+    """Resolve the watched_at field to a YYYY-MM-DD string or None."""
+    if watched_at == "today":
+        return date.today().isoformat()
+    return watched_at  # either a YYYY-MM-DD string or None
 
 
 # --- Endpoints ---
@@ -161,14 +231,13 @@ def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_db)):
             detail="Episode not found — open the Episodes panel first to cache them",
         )
 
-    now = datetime.now(timezone.utc).isoformat()
     ep.watched = body.watched
-    ep.watched_at = now if body.watched else None
+    ep.watched_at = _resolve_date(body.watched_at) if body.watched else None
 
     if body.watched:
         show = db.get(models.Show, ep.show_id)
         if show:
-            show.last_watched_at = now
+            show.last_watched_at = datetime.now(timezone.utc).isoformat()
 
     db.commit()
     return {"watched": ep.watched, "watched_at": ep.watched_at}
@@ -188,16 +257,16 @@ def mark_bulk_watched(body: BulkWatchedRequest, db: Session = Depends(get_db)):
     if not episodes:
         return {"marked": 0}
 
-    now = datetime.now(timezone.utc).isoformat()
+    resolved_date = _resolve_date(body.watched_at)
     for ep in episodes:
         ep.watched = True
-        ep.watched_at = now
+        ep.watched_at = resolved_date
 
     show = db.execute(
         select(models.Show).where(models.Show.tmdb_id == body.tmdb_show_id)
     ).scalar_one_or_none()
     if show:
-        show.last_watched_at = now
+        show.last_watched_at = datetime.now(timezone.utc).isoformat()
 
     db.commit()
     return {"marked": len(episodes)}

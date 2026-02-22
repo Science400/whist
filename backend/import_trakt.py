@@ -64,7 +64,7 @@ async def import_trakt(filepath: str) -> None:
                     tmdb_id=tmdb_id,
                     title=details.get("name", title),
                     poster_path=details.get("poster_path"),
-                    status="watching" if tmdb_status in _ACTIVE_STATUSES else "finished",
+                    user_status="airing" if tmdb_status in _ACTIVE_STATUSES else "done",
                     type="tv",
                     added_at=datetime.now(timezone.utc).isoformat(),
                     last_watched_at=entry.get("last_watched_at"),

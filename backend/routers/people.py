@@ -117,6 +117,34 @@ async def get_show_cast(tmdb_show_id: int, db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/people/{tmdb_person_id}/all-credits")
+def get_all_credits(tmdb_person_id: int, db: Session = Depends(get_db)):
+    """Return all cached credits for a person (not filtered by watch history)."""
+    person = db.execute(
+        select(models.Person).where(models.Person.tmdb_id == tmdb_person_id)
+    ).scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    rows = db.execute(
+        select(models.PersonCredit, models.Show.poster_path)
+        .outerjoin(models.Show, models.Show.tmdb_id == models.PersonCredit.show_tmdb_id)
+        .where(models.PersonCredit.person_tmdb_id == tmdb_person_id)
+        .order_by(models.PersonCredit.title)
+    ).all()
+
+    return [
+        {
+            "show_tmdb_id": pc.show_tmdb_id,
+            "title": pc.title,
+            "character": pc.character,
+            "type": pc.type,
+            "poster_path": poster_path,
+        }
+        for pc, poster_path in rows
+    ]
+
+
 @router.get("/people/{tmdb_person_id}/seen-in")
 async def seen_in(tmdb_person_id: int, db: Session = Depends(get_db)):
     """
