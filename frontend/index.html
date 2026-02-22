@@ -1085,10 +1085,9 @@
       app.querySelector('#ep-list').addEventListener('click', async e => {
         const check = e.target.closest('[data-check]');
         const editBtn = e.target.closest('[data-edit]');
-        const infoArea = e.target.closest('.ep-info');
+        const row = e.target.closest('.episode-row');
 
-        if (infoArea && !check && !editBtn) {
-          const row = infoArea.closest('[data-ep]');
+        if (row && !check && !editBtn) {
           navigate(`/show/${tmdbId}/season/${seasonNum}/episode/${+row.dataset.ep}`);
           return;
         }
