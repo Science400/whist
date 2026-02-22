@@ -327,7 +327,7 @@
     }
     .ep-check:hover { border-color: var(--accent); }
     .ep-check.watched { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .ep-info { flex: 1; min-width: 0; }
+    .ep-info { flex: 1; min-width: 0; cursor: pointer; }
     .ep-code { font-size: 0.7rem; color: var(--tx-dim); font-variant-numeric: tabular-nums; }
     .ep-title { font-size: 0.875rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .ep-air-date { font-size: 0.72rem; color: var(--tx-dim); flex-shrink: 0; }
@@ -1085,6 +1085,13 @@
       app.querySelector('#ep-list').addEventListener('click', async e => {
         const check = e.target.closest('[data-check]');
         const editBtn = e.target.closest('[data-edit]');
+        const infoArea = e.target.closest('.ep-info');
+
+        if (infoArea && !check && !editBtn) {
+          const row = infoArea.closest('[data-ep]');
+          navigate(`/show/${tmdbId}/season/${seasonNum}/episode/${+row.dataset.ep}`);
+          return;
+        }
 
         if (check) {
           const epNum = +check.dataset.check;
