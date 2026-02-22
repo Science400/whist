@@ -282,7 +282,7 @@
     .cast-grid::-webkit-scrollbar { height: 4px; }
     .cast-grid::-webkit-scrollbar-track { background: transparent; }
     .cast-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-    .cast-item { flex-shrink: 0; width: 76px; cursor: pointer; }
+    .cast-item { flex-shrink: 0; width: 76px; cursor: pointer; padding-top: 7px; }
     .cast-photo-wrap { position: relative; }
     .cast-photo {
       width: 76px; height: 76px;
@@ -297,6 +297,18 @@
       background: var(--surface-2);
       display: flex; align-items: center; justify-content: center;
       color: var(--tx-dim); font-size: 1.25rem;
+    }
+    .cast-badge {
+      position: absolute; top: -5px; right: -5px;
+      min-width: 22px; height: 22px;
+      border-radius: 11px;
+      background: var(--accent); color: #fff;
+      font-size: 0.7rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 5px;
+      border: 2.5px solid var(--bg);
+      pointer-events: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
     }
     .cast-name { font-size: 0.68rem; color: var(--tx); margin-top: 0.35rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .cast-char { font-size: 0.62rem; color: var(--tx-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -658,6 +670,7 @@
                   ${m.profile_path
                     ? `<img class="cast-photo" src="${img(m.profile_path,'w185')}" alt="${esc(m.name)}" loading="lazy">`
                     : `<div class="cast-photo-placeholder">👤</div>`}
+                  ${(m.seen_in_count > 0) ? `<div class="cast-badge">${m.seen_in_count}</div>` : ''}
                 </div>
                 <div class="cast-name">${esc(m.name)}</div>
                 <div class="cast-char">${esc(m.character||'')}</div>
@@ -1181,6 +1194,7 @@
                  <button class="btn btn-outline btn-sm" id="ep-watch-date">Log with date</button>`}
           </div>
           ${ep.overview?`<p style="color:var(--tx-dim);line-height:1.7;margin-bottom:2rem">${esc(ep.overview)}</p>`:''}
+          <div id="ep-cast-section"><div class="loading" style="padding:1rem 0;text-align:left">Loading cast…</div></div>
         </div>`;
 
       bindNav(app);
@@ -1208,6 +1222,20 @@
       app.querySelector('#ep-unwatch')?.addEventListener('click', async () => {
         await post('/episodes/watched', { tmdb_show_id: tmdbId, season_number: seasonNum, episode_number: epNum, watched: false });
         rerender();
+      });
+
+      // Load episode cast (non-blocking)
+      get(`/shows/${tmdbId}/season/${seasonNum}/episode/${epNum}/cast`).then(castData => {
+        const section = app.querySelector('#ep-cast-section');
+        if (!section) return;
+        let html = '';
+        if (castData.cast.length) html += castGridHTML(castData.cast, 'Cast');
+        if (castData.guest_stars.length) html += castGridHTML(castData.guest_stars, 'Guest Stars');
+        section.innerHTML = html || '';
+        if (html) bindNav(section);
+      }).catch(() => {
+        const section = app.querySelector('#ep-cast-section');
+        if (section) section.innerHTML = '';
       });
     }
 
