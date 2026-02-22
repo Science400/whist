@@ -25,25 +25,54 @@ def _norm_name(name: str) -> str:
     )
 
 
-def _dedup_providers(providers: list) -> list:
-    """Keep one provider per brand using prefix matching.
+_BRAND_DISPLAY = {
+    "paramount plus": "Paramount+",
+    "disney plus":    "Disney+",
+    "apple tv plus":  "Apple TV+",
+    "apple tv":       "Apple TV",
+    "amazon prime":   "Prime Video",
+    "hbo max":        "Max",
+}
 
-    Sorts by provider_id (lowest = most canonical), then skips any entry whose
-    normalized name starts with an already-kept canonical name.  This handles
-    variants like 'Paramount Plus Amazon Channel', 'Paramount Plus Essentials',
-    'Paramount+ Roku Premium Channel', etc. — all collapse into 'Paramount Plus'.
+
+def _lcp_words(word_lists: list[list[str]]) -> list[str]:
+    """Longest common word-prefix across all lists."""
+    prefix = list(word_lists[0])
+    for wl in word_lists[1:]:
+        prefix = [a for a, b in zip(prefix, wl) if a == b]
+        if not prefix:
+            break
+    return prefix
+
+
+def _dedup_providers(providers: list) -> list:
+    """Keep one provider per brand.
+
+    Groups by first word of normalized name.  Within each group the entry with
+    the shortest normalized name is used for the logo (fewest add-on qualifiers),
+    and the display name is replaced with the longest common word-prefix of the
+    group (e.g. all Paramount+ variants → 'Paramount+').
     """
-    seen: list[str] = []   # normalized names of kept providers
+    from collections import defaultdict
+    groups: dict[str, list] = defaultdict(list)
+    for p in providers:
+        words = _norm_name(p["provider_name"]).split()
+        key = words[0] if words else "__empty__"
+        groups[key].append(p)
+
     result = []
-    for p in sorted(providers, key=lambda x: x["provider_id"]):
-        n = _norm_name(p["provider_name"])
-        is_variant = any(
-            n == canon or (n.startswith(canon) and n[len(canon)] == " ")
-            for canon in seen
-        )
-        if not is_variant:
-            seen.append(n)
-            result.append(p)
+    for members in groups.values():
+        word_lists = [_norm_name(p["provider_name"]).split() for p in members]
+
+        # Shortest-name entry → cleanest logo (fewest add-on words)
+        best = min(members, key=lambda p: (len(_norm_name(p["provider_name"])), p["provider_id"]))
+
+        # Override display name with LCP, mapped to known brand names
+        lcp_str = " ".join(_lcp_words(word_lists))
+        display = _BRAND_DISPLAY.get(lcp_str, lcp_str.title())
+        result.append({**best, "provider_name": display})
+
+    result.sort(key=lambda p: p["provider_id"])
     return result
 
 # TMDB statuses that mean the show is still airing (used when auto-suggesting status on add)
