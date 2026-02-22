@@ -15,6 +15,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Ensure project root is on sys.path when run as a script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from sqlalchemy import select
 
 from backend.database import Base, SessionLocal, engine
