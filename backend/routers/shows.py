@@ -13,6 +13,39 @@ router = APIRouter(prefix="/shows", tags=["shows"])
 
 _VALID_STATUSES = {"airing", "binging", "caught_up", "done"}
 
+
+def _norm_name(name: str) -> str:
+    """Normalize brand symbols so 'Paramount+' and 'Paramount Plus' compare equal."""
+    return (
+        name.replace("Paramount+", "Paramount Plus")
+            .replace("Disney+", "Disney Plus")
+            .replace("Apple TV+", "Apple TV Plus")
+            .strip()
+            .lower()
+    )
+
+
+def _dedup_providers(providers: list) -> list:
+    """Keep one provider per brand using prefix matching.
+
+    Sorts by provider_id (lowest = most canonical), then skips any entry whose
+    normalized name starts with an already-kept canonical name.  This handles
+    variants like 'Paramount Plus Amazon Channel', 'Paramount Plus Essentials',
+    'Paramount+ Roku Premium Channel', etc. — all collapse into 'Paramount Plus'.
+    """
+    seen: list[str] = []   # normalized names of kept providers
+    result = []
+    for p in sorted(providers, key=lambda x: x["provider_id"]):
+        n = _norm_name(p["provider_name"])
+        is_variant = any(
+            n == canon or (n.startswith(canon) and n[len(canon)] == " ")
+            for canon in seen
+        )
+        if not is_variant:
+            seen.append(n)
+            result.append(p)
+    return result
+
 # TMDB statuses that mean the show is still airing (used when auto-suggesting status on add)
 _ACTIVE_TMDB_STATUSES = {"Returning Series", "In Production", "Planned", "Pilot"}
 
@@ -102,6 +135,29 @@ async def get_show_detail(tmdb_id: int, db: Session = Depends(get_db)):
             for s in details.get("seasons", [])
             if s["season_number"] > 0
         ],
+    }
+
+
+@router.get("/{tmdb_id}/watch-providers")
+async def get_show_watch_providers(tmdb_id: int):
+    """Streaming and rental providers for a show (US region, from TMDB)."""
+    try:
+        data = await tmdb.get_watch_providers(tmdb_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to fetch watch providers from TMDB")
+
+    us = data.get("results", {}).get("US", {})
+
+    def fmt(p):
+        return {
+            "provider_id":   p["provider_id"],
+            "provider_name": p["provider_name"],
+            "logo_path":     p.get("logo_path"),
+        }
+
+    return {
+        "streaming": _dedup_providers([fmt(p) for p in us.get("flatrate", [])]),
+        "rent":      _dedup_providers([fmt(p) for p in us.get("rent", [])]),
     }
 
 

@@ -78,3 +78,13 @@ async def get_episode_credits(tmdb_id: int, season_number: int, episode_number: 
     )
     r.raise_for_status()
     return r.json()
+
+
+async def get_watch_providers(tmdb_id: int) -> dict:
+    """GET /tv/{tmdb_id}/watch/providers — streaming/rent/buy options by region"""
+    r = await _client.get(
+        f"/tv/{tmdb_id}/watch/providers",
+        params={"api_key": settings.tmdb_api_key},
+    )
+    r.raise_for_status()
+    return r.json()

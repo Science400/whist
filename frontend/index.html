@@ -231,6 +231,41 @@
     .progress-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
     .progress-fill { height: 100%; background: var(--accent); }
 
+    /* ── Watch providers ────────────────────────────────────────────────── */
+    .provider-row { display: flex; gap: 1.25rem; flex-wrap: wrap; margin: 0.75rem 0; }
+    .provider-group { display: flex; align-items: center; gap: 0.5rem; }
+    .provider-label { font-size: 0.7rem; color: var(--tx-dim); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+    .provider-logos { display: flex; gap: 0.375rem; flex-wrap: wrap; align-items: center; }
+    .provider-logo {
+      width: 32px; height: 32px;
+      border-radius: 7px; overflow: hidden;
+      background: var(--surface-2);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0.55; font-size: 0.65rem; font-weight: 600; color: var(--tx-dim);
+      transition: opacity 0.15s;
+    }
+    .provider-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .provider-logo.provider-pref { opacity: 1; box-shadow: 0 0 0 2px var(--accent); }
+    .provider-logo:hover { opacity: 1; }
+    /* "others" toggle button */
+    .provider-toggle {
+      height: 32px; min-width: 28px; padding: 0 7px;
+      border-radius: 7px;
+      background: var(--surface-2); color: var(--tx-dim);
+      font-size: 0.68rem; font-weight: 600;
+      border: 1px solid var(--border); cursor: pointer;
+      align-self: center;
+      transition: background 0.1s, color 0.1s;
+    }
+    .provider-toggle:hover { background: var(--border); color: var(--tx); }
+    /* hidden overflow span — display:contents makes children join the flex row */
+    .provider-overflow { display: none; gap: 0.375rem; }
+    .provider-overflow.open { display: contents; }
+
+    /* ── Schedule card provider logos (compact, preferred-only) ─────────── */
+    .sched-providers { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    .sched-providers .provider-logo { width: 22px; height: 22px; border-radius: 5px; }
+
     /* ── Tabs ───────────────────────────────────────────────────────────── */
     .tabs { display: flex; border-bottom: 1px solid var(--border); margin: 1.5rem 0 1rem; }
     .tab {
@@ -319,6 +354,33 @@
       cursor: pointer;
     }
     .cast-see-more:hover { color: var(--accent); }
+
+    /* ── Schedule cards ─────────────────────────────────────────────────── */
+    .schedule-section { margin-bottom: 2rem; }
+    .schedule-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .schedule-card {
+      display: flex; gap: 0.875rem; align-items: center;
+      padding: 0.625rem 0.75rem;
+      background: var(--surface); border-radius: 10px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .schedule-card:hover { background: var(--surface-2); }
+    .sched-poster {
+      width: 52px; height: 78px;
+      object-fit: cover; border-radius: 6px;
+      background: var(--surface-2); flex-shrink: 0;
+    }
+    .sched-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+    .sched-title-row { display: flex; align-items: center; gap: 0.5rem; }
+    .sched-title { font-weight: 500; font-size: 0.9rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    .sched-ep { font-size: 0.78rem; color: var(--tx-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .sched-date { font-size: 0.72rem; color: var(--tx-dim); }
+    .sched-new-badge {
+      flex-shrink: 0;
+      background: var(--orange); color: #fff;
+      border-radius: 10px; padding: 0.1rem 0.45rem;
+      font-size: 0.65rem; font-weight: 700;
+    }
 
     /* ── Episode list ───────────────────────────────────────────────────── */
     .episode-list { display: flex; flex-direction: column; }
@@ -679,6 +741,97 @@
         </div>`;
     }
 
+    // ── Watch providers component ────────────────────────────────────────────
+
+    // Normalize brand symbols so "Paramount+" and "Paramount Plus" compare equal.
+    function _normProv(name) {
+      return name
+        .replace('Paramount+', 'Paramount Plus')
+        .replace('Disney+', 'Disney Plus')
+        .replace('Apple TV+', 'Apple TV Plus')
+        .toLowerCase();
+    }
+
+    // True if providerName matches a saved service (exact or prefix match after normalizing).
+    // e.g. savedSet has "Paramount+" → matches "Paramount Plus Amazon Channel" too.
+    function isPreferred(providerName, savedSet) {
+      const n = _normProv(providerName);
+      for (const s of savedSet) {
+        const sn = _normProv(s);
+        if (n === sn || n.startsWith(sn + ' ') || sn.startsWith(n + ' ')) return true;
+      }
+      return false;
+    }
+
+    function providerLogoHTML(p, savedSet) {
+      const pref = isPreferred(p.provider_name, savedSet);
+      return '<div class="provider-logo' + (pref ? ' provider-pref' : '') + '" title="' + esc(p.provider_name) + '">'
+        + (p.logo_path
+            ? '<img src="' + img(p.logo_path, 'w92') + '" alt="' + esc(p.provider_name) + '" loading="lazy">'
+            : '<span>' + esc(p.provider_name.slice(0, 2)) + '</span>')
+        + '</div>';
+    }
+
+    // Build one provider group (Stream or Rent).
+    // If the user has preferences and some match: show preferred + "+N others" toggle.
+    // Otherwise show all.
+    function _providerGroupHTML(providers, label, savedSet) {
+      if (!providers.length) return '';
+      const pref  = providers.filter(p =>  isPreferred(p.provider_name, savedSet));
+      const other = providers.filter(p => !isPreferred(p.provider_name, savedSet));
+      const collapse = savedSet.size > 0 && pref.length > 0 && other.length > 0;
+
+      let logos;
+      if (collapse) {
+        logos = pref.map(p => providerLogoHTML(p, savedSet)).join('');
+        logos += '<button class="provider-toggle"'
+          + " onclick=\"this.nextElementSibling.classList.add('open');this.hidden=true\""
+          + '>+' + other.length + '</button>';
+        logos += '<span class="provider-overflow">'
+          + other.map(p => providerLogoHTML(p, savedSet)).join('')
+          + '</span>';
+      } else {
+        logos = providers.map(p => providerLogoHTML(p, savedSet)).join('');
+      }
+
+      return '<div class="provider-group">'
+        + '<span class="provider-label">' + label + '</span>'
+        + '<div class="provider-logos">' + logos + '</div>'
+        + '</div>';
+    }
+
+    function providerRowHTML(streaming, rent, savedSet) {
+      if (!streaming.length && !rent.length) return '';
+      return '<div class="provider-row">'
+        + _providerGroupHTML(streaming, 'Stream', savedSet)
+        + _providerGroupHTML(rent, 'Rent', savedSet)
+        + '</div>';
+    }
+
+    // Shared helper: fetch and inject providers (non-blocking).
+    // selector: CSS selector for the target element within app.
+    // streamOnly: true = streaming logos only (compact), false = Stream + Rent groups.
+    function loadProviders(app, tmdbId, selector, streamOnly) {
+      const saved = JSON.parse(localStorage.getItem('whist_services') || '[]');
+      const savedSet = new Set(saved);
+      const sort = arr => [
+        ...arr.filter(p =>  isPreferred(p.provider_name, savedSet)),
+        ...arr.filter(p => !isPreferred(p.provider_name, savedSet)),
+      ];
+      get(`/shows/${tmdbId}/watch-providers`).then(prov => {
+        const el = app.querySelector(selector);
+        if (!el) return;
+        if (streamOnly) {
+          el.innerHTML = sort(prov.streaming).map(p => providerLogoHTML(p, savedSet)).join('');
+        } else {
+          el.innerHTML = providerRowHTML(sort(prov.streaming), sort(prov.rent), savedSet);
+        }
+      }).catch(() => {
+        const el = app.querySelector(selector);
+        if (el) el.remove();
+      });
+    }
+
     // ── Date picker ──────────────────────────────────────────────────────────
     function showDatePicker(titleStr, currentDate, onSave) {
       const tod = today(), yest = yesterday();
@@ -749,19 +902,95 @@
 
     // ── Page: Schedule ───────────────────────────────────────────────────────
     async function pageSchedule(app) {
+      let data;
+      try { data = await get('/schedule/today'); }
+      catch(e) {
+        app.innerHTML = `<div class="page"><div class="empty-state"><h3>Error loading schedule</h3><p>${esc(e.message)}</p></div></div>`;
+        return;
+      }
+
+      const SECTION_LABEL = {
+        airing_now:    'Airing Now',
+        keep_watching: 'Keep Watching',
+        up_next:       'Up Next',
+        pick_up_again: 'Pick Up Again',
+      };
+
+      function schedCardHTML(item) {
+        const { show, next_episode: ep, new_count } = item;
+        const code = epCode(ep.season_number, ep.episode_number);
+        const nav = `/show/${show.tmdb_id}/season/${ep.season_number}/episode/${ep.episode_number}`;
+        const badge = new_count > 1 ? `<span class="sched-new-badge">${new_count} new</span>` : '';
+        return `
+          <div class="schedule-card" data-nav="${nav}" data-show-id="${show.tmdb_id}">
+            ${show.poster_path
+              ? `<img class="sched-poster" src="${img(show.poster_path,'w185')}" alt="${esc(show.title)}" loading="lazy">`
+              : `<div class="sched-poster"></div>`}
+            <div class="sched-info">
+              <div class="sched-title-row">
+                <span class="sched-title">${esc(show.title)}</span>
+                ${badge}
+              </div>
+              <div class="sched-ep">${esc(code)}${ep.title ? ' · ' + esc(ep.title) : ''}</div>
+              ${ep.air_date ? `<div class="sched-date">${esc(ep.air_date)}</div>` : ''}
+              <div class="sched-providers"></div>
+            </div>
+          </div>`;
+      }
+
+      const order = ['airing_now', 'keep_watching', 'up_next', 'pick_up_again'];
+      const sections = order.filter(k => data[k].length);
+
+      let body;
+      if (!sections.length) {
+        body = `
+          <div class="empty-state">
+            <h3>Nothing queued up</h3>
+            <p>Mark episodes watched or set shows to Airing/Binging to see suggestions here.</p>
+            <button class="btn btn-accent" style="margin-top:1rem" data-nav="/library">Go to Library</button>
+          </div>`;
+      } else {
+        body = sections.map(k => `
+          <div class="schedule-section">
+            <div class="section-header">
+              <h2 style="color:var(--orange)">${SECTION_LABEL[k]}</h2>
+              <span class="section-count">${data[k].length}</span>
+            </div>
+            <div class="schedule-list">${data[k].map(schedCardHTML).join('')}</div>
+          </div>`).join('');
+      }
+
       app.innerHTML = `
         <div class="page">
           <div class="page-header">
             <h1>Schedule</h1>
-            <p>Your daily watch suggestions</p>
+            <p>What to watch today</p>
           </div>
-          <div class="empty-state">
-            <h3>Coming Soon</h3>
-            <p>The daily schedule is in progress. Browse your library in the meantime.</p>
-            <button class="btn btn-accent" style="margin-top:1rem" data-nav="/library">Go to Library</button>
-          </div>
+          ${body}
         </div>`;
       bindNav(app);
+
+      // Load preferred streaming providers for each unique show (non-blocking).
+      // On schedule cards only show services the user has saved — keeps cards clean.
+      const saved = JSON.parse(localStorage.getItem('whist_services') || '[]');
+      const savedSet = new Set(saved);
+      const allItems = [
+        ...data.airing_now, ...data.keep_watching, ...data.up_next, ...data.pick_up_again,
+      ];
+      const uniqueShowIds = [...new Set(allItems.map(item => item.show.tmdb_id))];
+      uniqueShowIds.forEach(showId => {
+        get(`/shows/${showId}/watch-providers`).then(prov => {
+          // Filter to preferred services only (or all if no preferences set)
+          const streaming = savedSet.size > 0
+            ? prov.streaming.filter(p => isPreferred(p.provider_name, savedSet))
+            : prov.streaming;
+          if (!streaming.length) return;
+          const html = streaming.map(p => providerLogoHTML(p, savedSet)).join('');
+          app.querySelectorAll(`[data-show-id="${showId}"] .sched-providers`).forEach(el => {
+            el.innerHTML = html;
+          });
+        }).catch(() => {});
+      });
     }
 
     // ── Page: Library ────────────────────────────────────────────────────────
@@ -934,6 +1163,7 @@
               <div class="show-meta">${esc(meta)}</div>
               ${statusHTML}
               ${progressHTML}
+              <div id="watch-providers"></div>
               <p class="show-overview">${esc(detail.overview||'')}</p>
             </div>
           </div>
@@ -996,6 +1226,9 @@
           } catch(e) { alert('Error: ' + e.message); }
         });
       }
+
+      // Load watch providers (non-blocking)
+      loadProviders(app, tmdbId, '#watch-providers', false);
     }
 
     // ── Page: Season ─────────────────────────────────────────────────────────
@@ -1050,6 +1283,7 @@
               <div class="progress-bar" style="max-width:220px;margin-top:0.3rem" id="prog-bar">
                 <div class="progress-fill" id="prog-fill" style="width:${pct}%"></div>
               </div>
+              <div id="season-providers"></div>
             </div>
           </div>
           <div class="bulk-actions">
@@ -1067,6 +1301,9 @@
         const el = app.querySelector('#show-crumb');
         if (el) el.textContent = d.title;
       }).catch(()=>{});
+
+      // Load watch providers (non-blocking)
+      loadProviders(app, tmdbId, '#season-providers', false);
 
       function updateProgress() {
         const w = Object.values(epState).filter(s => s.watched).length;
@@ -1193,6 +1430,7 @@
               : `<button class="btn btn-accent" id="ep-watch">Mark Watched</button>
                  <button class="btn btn-outline btn-sm" id="ep-watch-date">Log with date</button>`}
           </div>
+          <div id="ep-providers"></div>
           ${ep.overview?`<p style="color:var(--tx-dim);line-height:1.7;margin-bottom:2rem">${esc(ep.overview)}</p>`:''}
           <div id="ep-cast-section"><div class="loading" style="padding:1rem 0;text-align:left">Loading cast…</div></div>
         </div>`;
@@ -1202,6 +1440,9 @@
       get(`/shows/${tmdbId}/detail`).then(d => {
         const el = app.querySelector('#show-crumb'); if (el) el.textContent = d.title;
       }).catch(()=>{});
+
+      // Load watch providers (non-blocking)
+      loadProviders(app, tmdbId, '#ep-providers', false);
 
       app.querySelector('#ep-watch')?.addEventListener('click', async () => {
         await post('/episodes/watched', { tmdb_show_id: tmdbId, season_number: seasonNum, episode_number: epNum, watched: true, watched_at: 'today' });
@@ -1326,7 +1567,7 @@
 
     // ── Page: Settings ───────────────────────────────────────────────────────
     function pageSettings(app) {
-      const services = ['Netflix','Hulu','HBO Max','Apple TV+','Peacock','Paramount+','Disney+','Prime Video','Tubi','Crunchyroll','Shudder','MUBI'];
+      const services = ['Netflix','Hulu','Max','Apple TV+','Peacock','Paramount+','Disney+','Prime Video','Tubi','Crunchyroll','Shudder','MUBI'];
       const saved = JSON.parse(localStorage.getItem('whist_services')||'[]');
 
       app.innerHTML = `
@@ -1335,7 +1576,7 @@
           <div style="max-width:440px">
             <div style="background:var(--surface);border-radius:12px;padding:1.25rem">
               <h2 style="font-size:1rem;margin-bottom:0.25rem">My Streaming Services</h2>
-              <p style="font-size:0.82rem;color:var(--tx-dim);margin-bottom:1rem">Preferred services appear first on show pages.</p>
+              <p style="font-size:0.82rem;color:var(--tx-dim);margin-bottom:1rem">Preferred services appear first; others are hidden behind a toggle.</p>
               <div id="svc-list" style="display:flex;flex-direction:column;gap:0.25rem">
                 ${services.map(s => `
                   <label style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem;border-radius:8px;cursor:pointer">
