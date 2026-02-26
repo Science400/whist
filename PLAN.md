@@ -44,47 +44,37 @@ A working local web app where you can:
 ## Phase 6 — Library & Status Overhaul (next up)
 
 ### Status taxonomy redesign
-Replace the current 4-bucket system (airing/binging/caught_up/done) with statuses
-that reflect real intent. Some display categories are *derived* from stored status
-+ watch progress; they don't all need to be stored.
+Replace the 4-bucket system with 5 stored statuses that reflect user intent.
+Key split: **airing** = show still releasing, follow on its schedule;
+**watching** = show complete/far behind, work through at own pace.
+Derived sub-categories (On Hiatus, Airing — caught up, etc.) deferred to Phase 7.
 
-Stored user statuses:
-- `watching`   — actively working through it (currently airing OR bingeing)
-- `rewatching` — second+ pass; supports multiple watch dates per episode
-- `up_next`    — on the list, haven't started
-- `abandoned`  — not continuing
-- `hiatus`     — waiting for new season / return
+Stored user statuses (5):
+- `airing`    — following a show that is still releasing new episodes
+- `watching`  — working through a completed show at own pace (first time or rewatch)
+- `finished`  — completed watching
+- `watchlist` — intend to start someday
+- `abandoned` — gave up on it
 
-Display categories for both library and schedule (derived from status + progress):
-1. **Airing — episodes available** (watching + current season has unwatched aired eps + you've started that season)
-2. **Airing — caught up** (watching + all aired eps watched)
-3. **Airing — not started** (watching + 0 eps watched this season)
-4. **Rewatching — episodes available**
-5. **Rewatching — caught up**
-6. **Finished** (show ended + fully watched)
-7. **Abandoned**
-8. **Returning — nothing new yet** (hiatus status, or watching but between seasons)
+Note: "hiatus" is derived (not stored) — airing + caught up + no new eps = between seasons.
 
-**Migration mapping** (existing → new stored status):
-- `airing` → `watching`
-- `binging` → `watching`
-- `caught_up` → `watching`
-- `done` → `watching` (display category "Finished" derived if show ended + fully watched)
+**Migration mapping** (existing → new):
+- `airing`    → `airing`
+- `caught_up` → `airing`    (caught up = still following an airing show)
+- `binging`   → `watching`  (binging a completed show = watching)
+- `done`      → `finished`  (done = finished watching)
 
 **Backend todos:**
-- [ ] Write DB migration: update `user_status` values in shows table per mapping above
-- [ ] Update `Show` model: replace status enum/validation with new 5-value set
-- [ ] Add `derive_display_category(show, tmdb_status, watched, total, latest_season_watched)` helper — returns one of the 8 display categories
-- [ ] Update `GET /shows` response to include `display_category` field
-- [ ] Update `PATCH /shows/{id}/status` to accept new status values
-- [ ] Update schedule router: replace status checks (`airing`, `binging`) with new values
+- [ ] `backend/main.py`: add startup migration SQL (safe to re-run; WHERE clause scoped to old values)
+- [ ] `backend/routers/shows.py`: update `_VALID_STATUSES` to `{"airing","watching","finished","watchlist","abandoned"}`
+- [ ] `backend/routers/schedule.py`: replace `"binging"` with `"watching"` (3 occurrences)
+- [ ] `backend/import_trakt.py`: replace `"done"` with `"finished"` in auto-status assignment
+- [ ] `backend/models.py`: update `user_status` column comment
 
 **Frontend todos:**
-- [ ] Update `STATUS_LABEL` constant for 5 stored statuses
-- [ ] Update library: group sections by `display_category` instead of raw `user_status`
-- [ ] Update section colors/labels for all 8 display categories
-- [ ] Update show page: replace 4 status buttons with 5
-- [ ] Update schedule page: replace status-bucket logic with display category logic
+- [ ] Update `STATUS_LABEL` constant (5 entries; `watchlist` and `finished` replace old values)
+- [ ] `pageLibrary()`: update groups dict, order, and section colors for 5 sections
+- [ ] `pageShow()`: status buttons update automatically from `STATUS_LABEL` (no structural change)
 
 ### Multiple watch dates
 - The DB currently allows one watched_at per episode. Rewatching needs multiple.
@@ -179,6 +169,7 @@ Three modes settable per show:
 ## Other Features (To Be Categorized)
 - [ ] On a person page, divide their things I've seen them in into main character vs guest
 - [ ] Fix Add to Library 500 Internal Server Error
+- [ ] Import old watchlists from Trakt
 
 ## Out of Scope
 - Multiple user accounts

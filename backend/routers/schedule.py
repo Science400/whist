@@ -84,8 +84,8 @@ def get_schedule_today(db: Session = Depends(get_db)):
                     airing_now.append(_ep_card(show, next_ep, new_count))
                     continue
 
-        # --- Keep Watching: binging + recently active ---
-        if status == "binging" and lwa and lwa >= cutoff_active:
+        # --- Keep Watching: watching + recently active ---
+        if status == "watching" and lwa and lwa >= cutoff_active:
             next_ep = db.execute(
                 select(models.Episode)
                 .where(
@@ -99,8 +99,8 @@ def get_schedule_today(db: Session = Depends(get_db)):
                 keep_watching.append(_ep_card(show, next_ep, 0))
                 continue
 
-        # --- Up Next: binging + idle ---
-        if status == "binging":
+        # --- Up Next: watching + idle ---
+        if status == "watching":
             next_ep = db.execute(
                 select(models.Episode)
                 .where(
@@ -114,8 +114,8 @@ def get_schedule_today(db: Session = Depends(get_db)):
                 up_next.append(_ep_card(show, next_ep, 0))
                 continue
 
-        # --- Pick Up Again: airing/binging, idle 30+ days, has unwatched aired eps ---
-        if status in ("airing", "binging") and lwa and lwa < cutoff_idle:
+        # --- Pick Up Again: airing/watching, idle 30+ days, has unwatched aired eps ---
+        if status in ("airing", "watching") and lwa and lwa < cutoff_idle:
             next_ep = db.execute(
                 select(models.Episode)
                 .where(

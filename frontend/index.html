@@ -621,8 +621,8 @@
       add:      'var(--red)',
       settings: 'var(--red)',
     };
-    const STATUS_LABEL = { airing: 'Airing Now', binging: 'Binging', caught_up: 'Caught Up', done: 'Done' };
-    const STATUS_COLOR = { airing: 'var(--orange)', binging: 'var(--yellow)', caught_up: 'var(--cyan)', done: 'var(--muted)' };
+    const STATUS_LABEL = { airing: 'Airing', watching: 'Watching', finished: 'Finished', watchlist: 'Watchlist', abandoned: 'Abandoned' };
+    const STATUS_COLOR = { airing: 'var(--orange)', watching: 'var(--yellow)', finished: 'var(--cyan)', watchlist: 'var(--blue)', abandoned: 'var(--muted)' };
 
     // ── Router ───────────────────────────────────────────────────────────────
     function navigate(path) { history.pushState({}, '', path); render(); }
@@ -1055,8 +1055,8 @@
       const countEl     = app.querySelector('#lib-count');
 
       const segCache = {}; // tmdb_id -> segBarHTML string ('' if no episodes)
-      const order = ['airing', 'binging', 'caught_up', 'done'];
-      const sectionColors = { airing: 'var(--orange)', binging: 'var(--yellow)', caught_up: 'var(--cyan)', done: 'var(--muted)' };
+      const order = ['airing', 'watching', 'finished', 'watchlist', 'abandoned'];
+      const sectionColors = { airing: 'var(--orange)', watching: 'var(--yellow)', finished: 'var(--cyan)', watchlist: 'var(--blue)', abandoned: 'var(--muted)' };
 
       function renderGrid() {
         const q  = searchInput.value.toLowerCase().trim();
@@ -1086,9 +1086,9 @@
         }
 
         // Group into status sections
-        const groups = { airing: [], binging: [], caught_up: [], done: [] };
+        const groups = { airing: [], watching: [], finished: [], watchlist: [], abandoned: [] };
         sorted.forEach(function(s) {
-          (groups[s.user_status] ? groups[s.user_status] : groups.done).push(s);
+          (groups[s.user_status] ? groups[s.user_status] : groups.watching).push(s);
         });
 
         // Render

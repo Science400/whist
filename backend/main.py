@@ -31,6 +31,17 @@ def _run_migrations() -> None:
             WHERE user_status IS NULL
         """))
 
+        # Migration 4: rename status values to new 5-value taxonomy
+        conn.execute(text("""
+            UPDATE shows SET user_status = CASE
+                WHEN user_status = 'binging'   THEN 'watching'
+                WHEN user_status = 'caught_up' THEN 'airing'
+                WHEN user_status = 'done'      THEN 'finished'
+                ELSE user_status
+            END
+            WHERE user_status IN ('binging', 'caught_up', 'done')
+        """))
+
         # Migration 3: truncate watched_at timestamps to YYYY-MM-DD
         conn.execute(text("""
             UPDATE episodes

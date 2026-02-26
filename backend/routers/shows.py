@@ -11,7 +11,7 @@ from backend import tmdb
 
 router = APIRouter(prefix="/shows", tags=["shows"])
 
-_VALID_STATUSES = {"airing", "binging", "caught_up", "done"}
+_VALID_STATUSES = {"airing", "watching", "finished", "watchlist", "abandoned"}
 
 
 def _norm_name(name: str) -> str:
@@ -87,7 +87,7 @@ class ShowSearchRequest(BaseModel):
 
 class ShowAddRequest(BaseModel):
     tmdb_id: int
-    user_status: str = "airing"   # airing | binging | caught_up | done
+    user_status: str = "airing"   # airing | watching | finished | watchlist | abandoned
     type: str = "tv"
 
 
