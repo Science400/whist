@@ -65,10 +65,43 @@ Display categories for both library and schedule (derived from status + progress
 7. **Abandoned**
 8. **Returning — nothing new yet** (hiatus status, or watching but between seasons)
 
+**Migration mapping** (existing → new stored status):
+- `airing` → `watching`
+- `binging` → `watching`
+- `caught_up` → `watching`
+- `done` → `watching` (display category "Finished" derived if show ended + fully watched)
+
+**Backend todos:**
+- [ ] Write DB migration: update `user_status` values in shows table per mapping above
+- [ ] Update `Show` model: replace status enum/validation with new 5-value set
+- [ ] Add `derive_display_category(show, tmdb_status, watched, total, latest_season_watched)` helper — returns one of the 8 display categories
+- [ ] Update `GET /shows` response to include `display_category` field
+- [ ] Update `PATCH /shows/{id}/status` to accept new status values
+- [ ] Update schedule router: replace status checks (`airing`, `binging`) with new values
+
+**Frontend todos:**
+- [ ] Update `STATUS_LABEL` constant for 5 stored statuses
+- [ ] Update library: group sections by `display_category` instead of raw `user_status`
+- [ ] Update section colors/labels for all 8 display categories
+- [ ] Update show page: replace 4 status buttons with 5
+- [ ] Update schedule page: replace status-bucket logic with display category logic
+
 ### Multiple watch dates
 - The DB currently allows one watched_at per episode. Rewatching needs multiple.
 - Add a `rewatch_log` table for secondary watches (keeps primary watch history clean).
 - UI: show most recent watch date; log icon to see full history.
+
+**Backend todos:**
+- [ ] Add `rewatch_log` table: `(id, tmdb_show_id, season_number, episode_number, watched_at)`
+- [ ] Write DB migration to create the table
+- [ ] Update `POST /episodes/watched` — if `watched=true` and episode already has `watched=true`, append to `rewatch_log` instead of updating `watched_at`
+- [ ] New `GET /shows/{id}/season/{n}/episode/{e}/watch-history` — returns all watch dates (primary + rewatches) in reverse order
+- [ ] Update season endpoint to include `rewatch_count` per episode
+
+**Frontend todos:**
+- [ ] Season page: show rewatch count badge (e.g. "×3") on multi-watched episode rows
+- [ ] Season page: log icon on episode rows that opens a simple watch-history popover
+- [ ] Episode detail page: show full watch history list
 
 ### Progress bars ✓
 - [x] `GET /shows` includes watched/total episode counts per show
