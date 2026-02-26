@@ -9,43 +9,141 @@ A working local web app where you can:
 
 ---
 
-## Phase 1 — Foundation
-- [ ] Project scaffold (FastAPI + SQLAlchemy + SQLite)
-- [ ] `.env` config loading
-- [ ] TMDB API client with basic search and show fetch
-- [ ] DB models and migrations (see SCHEMA.md)
-- [ ] `POST /shows/search` — search TMDB by title
-- [ ] `POST /shows/add` — save a show to local DB with status (watching/watchlist/watched)
-- [ ] `GET /shows` — list all tracked shows
+## Completed Phases
 
-## Phase 2 — Episode Tracking
-- [ ] `GET /shows/{id}/episodes` — fetch and cache episode list from TMDB
-- [ ] `POST /episodes/watched` — mark a single episode watched
-- [ ] `POST /episodes/watched/bulk` — mark a full season or show watched
-- [ ] `GET /shows/{id}/progress` — current season/episode and % complete
+### Phase 1 — Foundation ✓
+- [x] Project scaffold (FastAPI + SQLAlchemy + SQLite)
+- [x] `.env` config loading
+- [x] TMDB API client with basic search and show fetch
+- [x] DB models and migrations
+- [x] `POST /shows/search`, `POST /shows/add`, `GET /shows`
 
-## Phase 3 — The Main Feature: "Where Have I Seen Them?"
-- [ ] `GET /shows/{id}/cast` — fetch cast from TMDB, cache people locally
-- [ ] `GET /people/{id}/seen-in` — given a person's TMDB ID, return all their credits that overlap with the user's watch history
-- [ ] Frontend cast page: click an actor → see your overlap instantly
+### Phase 2 — Episode Tracking ✓
+- [x] Fetch and cache episode lists from TMDB
+- [x] `POST /episodes/watched` — single episode
+- [x] `POST /episodes/watched/bulk` — full season
+- [x] `GET /shows/{id}/progress`
 
-## Phase 4 — Daily Schedule
-- [ ] Pull air dates for currently-watching shows from TMDB
-- [ ] Identify "new episode today/this week" shows
-- [ ] Identify next unwatched episode for binge shows
-- [ ] `GET /schedule/today` — returns an ordered suggestion list
-- [ ] Basic weighting: prioritize new air dates, then shows not watched recently
+### Phase 3 — "Where Have I Seen Them?" ✓
+- [x] `GET /shows/{id}/cast` with local caching
+- [x] `GET /people/{id}/seen-in` — credits ∩ watch history
+- [x] Cast grid with "seen in N" badges; click actor → person page
 
-## Phase 5 — Import & Polish
-- [ ] Trakt export importer (JSON → watch_history bulk insert)
-- [ ] Simple frontend for all of the above
-- [ ] Docker compose setup for easy hosting
+### Phase 4 — Daily Schedule ✓
+- [x] `GET /schedule/today` — airing now / keep watching / up next / pick up again
+- [x] Air date awareness, binge progress, "not watched recently" nudges
+
+### Phase 5 — Import & Polish ✓
+- [x] Trakt JSON importer
+- [x] Full frontend (schedule, library, show/season/episode/person pages)
+- [x] Watch providers with deduplication and preferred-service highlighting
+- [x] Docker compose
 
 ---
 
-## Out of Scope for MVP
-- Mobile app
+## Phase 6 — Library & Status Overhaul (next up)
+
+### Status taxonomy redesign
+Replace the current 4-bucket system (airing/binging/caught_up/done) with statuses
+that reflect real intent. Some display categories are *derived* from stored status
++ watch progress; they don't all need to be stored.
+
+Stored user statuses:
+- `watching`   — actively working through it (currently airing OR bingeing)
+- `rewatching` — second+ pass; supports multiple watch dates per episode
+- `up_next`    — on the list, haven't started
+- `abandoned`  — not continuing
+- `hiatus`     — waiting for new season / return
+
+Display categories for both library and schedule (derived from status + progress):
+1. **Airing — episodes available** (watching + current season has unwatched aired eps + you've started that season)
+2. **Airing — caught up** (watching + all aired eps watched)
+3. **Airing — not started** (watching + 0 eps watched this season)
+4. **Rewatching — episodes available**
+5. **Rewatching — caught up**
+6. **Finished** (show ended + fully watched)
+7. **Abandoned**
+8. **Returning — nothing new yet** (hiatus status, or watching but between seasons)
+
+### Multiple watch dates
+- The DB currently allows one watched_at per episode. Rewatching needs multiple.
+- Add a `rewatch_log` table for secondary watches (keeps primary watch history clean).
+- UI: show most recent watch date; log icon to see full history.
+
+### Progress bars (currently broken — hardcoded to 0%)
+- `GET /shows` needs to include watched/total episode counts per show
+- Poster cards in library should show real progress
+- Season rows on the show page should show season-level progress
+
+### Other library improvements
+- [ ] Search/filter bar (critical at 160+ shows)
+- [ ] Sort options: last watched, alphabetical, progress %, air date
+- [ ] Show episode progress % on poster cards (fix broken bars)
+
+---
+
+## Phase 7 — Schedule Improvements
+
+### Currently-airing logic
+- Only show a show's episodes if you've *started* the current season.
+  If there are 6+ unwatched aired episodes and you haven't started, skip it —
+  you're not ready to catch up yet. Surface it in "Airing — not started" instead.
+- Once you start a season, show the unwatched aired episodes up to the current one.
+
+### Binge pace control (for completed shows and rewatches)
+Three modes settable per show:
+- **Binge** — show as many as feel right, no limit
+- **Fast** — surface it every session, 1–2 eps
+- **Weekly** — appear roughly once a week
+
+### Daily cap
+- Configurable total episode limit for the day's schedule
+- When the cap is hit, stop adding more — prevents overwhelming queues
+- Shows near the cap threshold get priority by last-watched date
+
+### Other schedule items
+- [ ] Upcoming episode calendar — what's airing this week/month
+- [ ] Option to dismiss a show from today without abandoning it
+
+---
+
+## Phase 8 — Mobile & UI Refresh
+
+- [ ] Mobile-responsive layout (works well on phone)
+- [ ] Possibly installable as PWA (home screen shortcut; not ideal since it doesn't
+      go to app drawer on Android — revisit when mobile layout is solid)
+- [ ] Replace horizontal-scroll cast grids with wrapping grid option
+- [ ] Visual redesign — less utilitarian
+- [ ] Show years in the appropriate places
+
+---
+
+## Phase 9 — Content Enrichment
+
+- [ ] Actor ages at time of filming (season air year − birth year)
+- [ ] Movie tracking (DB schema already supports it)
+- [ ] External links — TMDB, IMDb, Wikipedia, Rotten Tomatoes on show/person pages
+- [ ] Genre and network metadata for filtering
+
+---
+
+## Phase 10 — Watchlist & Discovery
+
+- [ ] Watchlist — shows to check out, not yet tracking
+- [ ] "Movie night" picks — shared list for choosing together
+
+---
+
+## Phase 11 — Stats & Data
+
+- [ ] Watch statistics: total hours, shows per year, episodes per week, etc.
+- [ ] Completion rates, longest streaks, most-watched genres/networks
+- [ ] Data export (CSV or JSON) for backup
+
+---
+
+## Out of Scope
 - Multiple user accounts
-- Movie tracking (add later — schema supports it)
 - Social/sharing features
-- Ratings and reviews
+- Public recommendations engine
+- Show/episode ratings (user won't use them)

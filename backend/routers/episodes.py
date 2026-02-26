@@ -186,6 +186,41 @@ async def get_show_progress(tmdb_show_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/shows/{tmdb_show_id}/season-progress")
+def get_season_progress(tmdb_show_id: int, db: Session = Depends(get_db)):
+    """Per-season episode progress for a show.
+
+    Returns a list of seasons, each with watched/total counts and a per-episode
+    array of {number, watched} objects in episode_number order.  Returns [] if
+    no episodes are cached yet (not an error).
+    """
+    rows = db.execute(
+        select(
+            models.Episode.season_number,
+            models.Episode.episode_number,
+            models.Episode.watched,
+        )
+        .where(models.Episode.tmdb_show_id == tmdb_show_id)
+        .order_by(models.Episode.season_number, models.Episode.episode_number)
+    ).all()
+
+    seasons: dict[int, list] = {}
+    for season_number, episode_number, watched in rows:
+        seasons.setdefault(season_number, []).append(
+            {"number": episode_number, "watched": watched}
+        )
+
+    return [
+        {
+            "season_number": sn,
+            "watched": sum(1 for e in eps if e["watched"]),
+            "total": len(eps),
+            "episodes": eps,
+        }
+        for sn, eps in sorted(seasons.items())
+    ]
+
+
 # --- Schemas ---
 
 def _today() -> str:

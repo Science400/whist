@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func, case
 
 from backend.database import get_db
 from backend import models
@@ -104,6 +104,8 @@ class ShowResponse(BaseModel):
     type: str
     added_at: str
     last_watched_at: str | None
+    watched_count: int = 0
+    total_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -249,8 +251,21 @@ def update_show_status(tmdb_id: int, body: ShowStatusRequest, db: Session = Depe
 
 @router.get("", response_model=list[ShowResponse])
 def list_shows(db: Session = Depends(get_db)):
-    """List all tracked shows, ordered by most recently watched first."""
-    shows = db.execute(
-        select(models.Show).order_by(models.Show.last_watched_at.desc().nulls_last())
-    ).scalars().all()
-    return shows
+    """List all tracked shows with episode progress, ordered by most recently watched first."""
+    rows = db.execute(
+        select(
+            models.Show,
+            func.count(models.Episode.id).label("total_count"),
+            func.sum(case((models.Episode.watched == True, 1), else_=0)).label("watched_count"),
+        )
+        .outerjoin(models.Episode, models.Episode.tmdb_show_id == models.Show.tmdb_id)
+        .group_by(models.Show.id)
+        .order_by(models.Show.last_watched_at.desc().nulls_last())
+    ).all()
+
+    result = []
+    for show, total, watched in rows:
+        show.total_count = total or 0
+        show.watched_count = watched or 0
+        result.append(show)
+    return result

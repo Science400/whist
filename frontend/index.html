@@ -266,18 +266,6 @@
     .sched-providers { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.25rem; }
     .sched-providers .provider-logo { width: 22px; height: 22px; border-radius: 5px; }
 
-    /* ── Tabs ───────────────────────────────────────────────────────────── */
-    .tabs { display: flex; border-bottom: 1px solid var(--border); margin: 1.5rem 0 1rem; }
-    .tab {
-      padding: 0.6rem 1rem;
-      font-size: 0.875rem; color: var(--tx-dim);
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
-      transition: color 0.1s;
-    }
-    .tab:hover { color: var(--tx); }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
     /* ── Season list ────────────────────────────────────────────────────── */
     .season-list { display: flex; flex-direction: column; gap: 0.5rem; }
     .season-row {
@@ -303,8 +291,10 @@
     .season-info { flex: 1; min-width: 0; }
     .season-name { font-weight: 500; font-size: 0.9rem; }
     .season-meta { font-size: 0.78rem; color: var(--tx-dim); margin: 0.2rem 0 0.4rem; }
-    .season-bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
-    .season-bar-fill { height: 100%; background: var(--accent); }
+    /* Segmented episode bar — no gap, container clips rounded corners */
+    .seg-bar { display: flex; gap: 0; height: 3px; border-radius: 2px; overflow: hidden; }
+    .seg-bar .seg { flex: 1; min-width: 1px; height: 100%; background: var(--border); }
+    .seg-bar .seg.w { background: var(--accent); }
     .season-chevron { color: var(--tx-dim); font-size: 1.1rem; }
 
     /* ── Cast grid ──────────────────────────────────────────────────────── */
@@ -681,6 +671,17 @@
     function today() { return new Date().toISOString().slice(0, 10); }
     function yesterday() { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
 
+    // episodes: [{number: int, watched: bool}, ...]
+    // Renders a flush segmented bar; container clips to border-radius.
+    function segBarHTML(episodes) {
+      if (!episodes.length) return '<div class="seg-bar"></div>';
+      return '<div class="seg-bar">'
+        + episodes.map(function(e) {
+            return '<div class="seg' + (e.watched ? ' w' : '') + '" data-seg="' + e.number + '"></div>';
+          }).join('')
+        + '</div>';
+    }
+
     // Attach click listeners to all [data-nav] elements within a root
     function bindNav(root) {
       (root || document).querySelectorAll('[data-nav]').forEach(el => {
@@ -890,13 +891,16 @@
     // ── Poster card ──────────────────────────────────────────────────────────
     function posterCardHTML(show) {
       const href = `/show/${show.tmdb_id}`;
+      const pct = show.total_count > 0 ? Math.round(show.watched_count / show.total_count * 100) : 0;
       return `
         <div class="poster-card" data-nav="${href}">
           ${show.poster_path
             ? `<img src="${img(show.poster_path,'w300')}" alt="${esc(show.title)}" loading="lazy">`
             : `<div class="poster-placeholder">${esc(show.title)}</div>`}
           <div class="card-title">${esc(show.title)}</div>
-          <div class="card-progress"><div class="card-progress-fill" style="width:0%"></div></div>
+          <div class="card-progress" data-seg-card="${show.tmdb_id}">
+            <div class="card-progress-fill" style="width:${pct}%"></div>
+          </div>
         </div>`;
     }
 
@@ -1036,6 +1040,19 @@
           ${body}
         </div>`;
       bindNav(app);
+
+      // Upgrade poster card bars to segmented episode bars (non-blocking, one request per show).
+      // Shows the solid percentage fill first, then replaces with detailed segments once loaded.
+      shows.forEach(function(show) {
+        get('/shows/' + show.tmdb_id + '/season-progress').then(function(seasons) {
+          const el = app.querySelector('[data-seg-card="' + show.tmdb_id + '"]');
+          if (!el) return;
+          // Flatten all seasons; use sequential index so numbers don't repeat across seasons
+          const episodes = seasons.flatMap(function(s) { return s.episodes; })
+                                  .map(function(e, i) { return { number: i, watched: e.watched }; });
+          if (episodes.length) el.innerHTML = segBarHTML(episodes);
+        }).catch(function() {});
+      });
     }
 
     // ── Page: Add Show ───────────────────────────────────────────────────────
@@ -1140,7 +1157,7 @@
           <div class="season-info">
             <div class="season-name">${esc(s.name||`Season ${s.season_number}`)}</div>
             <div class="season-meta">${s.air_date?s.air_date+' · ':''}${s.episode_count} ep</div>
-            <div class="season-bar"><div class="season-bar-fill" style="width:0%"></div></div>
+            <div class="season-bar-wrap" data-season="${s.season_number}"></div>
           </div>
           <span class="season-chevron">›</span>
         </div>`).join('');
@@ -1167,36 +1184,35 @@
               <p class="show-overview">${esc(detail.overview||'')}</p>
             </div>
           </div>
-          <div class="tabs">
-            <button class="tab active" id="tab-s">Seasons</button>
-            <button class="tab" id="tab-c">Cast</button>
+          <div class="section" style="margin-top:1.75rem">
+            <div class="section-header"><h2>Cast</h2></div>
+            <div id="cast-pane"><div class="loading" style="padding:0.5rem 0;text-align:left;font-size:0.85rem">Loading cast…</div></div>
           </div>
-          <div id="pane-s"><div class="season-list">${seasonsHTML}</div></div>
-          <div id="pane-c" style="display:none"><div class="loading">Loading cast…</div></div>
+          <div class="section">
+            <div class="section-header"><h2>Seasons</h2></div>
+            <div class="season-list">${seasonsHTML}</div>
+          </div>
         </div>`;
 
       bindNav(app);
 
-      // Tabs
-      app.querySelector('#tab-s').addEventListener('click', () => {
-        app.querySelector('#tab-s').classList.add('active');
-        app.querySelector('#tab-c').classList.remove('active');
-        app.querySelector('#pane-s').style.display = '';
-        app.querySelector('#pane-c').style.display = 'none';
-      });
-      app.querySelector('#tab-c').addEventListener('click', async () => {
-        app.querySelector('#tab-c').classList.add('active');
-        app.querySelector('#tab-s').classList.remove('active');
-        app.querySelector('#pane-s').style.display = 'none';
-        const pane = app.querySelector('#pane-c');
-        pane.style.display = '';
-        if (pane.querySelector('.loading')) {
-          try {
-            const cast = await get(`/shows/${tmdbId}/cast`);
-            pane.innerHTML = castGridHTML(cast);
-            bindNav(pane);
-          } catch(e) { pane.innerHTML = `<p style="color:var(--tx-dim)">Cast unavailable.</p>`; }
-        }
+      // Load season progress bars (non-blocking)
+      get(`/shows/${tmdbId}/season-progress`).then(function(seasons) {
+        seasons.forEach(function(s) {
+          const wrap = app.querySelector('.season-bar-wrap[data-season="' + s.season_number + '"]');
+          if (wrap) wrap.outerHTML = segBarHTML(s.episodes);
+        });
+      }).catch(function() {});
+
+      // Load cast (non-blocking)
+      get(`/shows/${tmdbId}/cast`).then(cast => {
+        const pane = app.querySelector('#cast-pane');
+        if (!pane) return;
+        pane.innerHTML = castGridHTML(cast);
+        bindNav(pane);
+      }).catch(() => {
+        const pane = app.querySelector('#cast-pane');
+        if (pane) pane.innerHTML = '';
       });
 
       // Status buttons
@@ -1246,7 +1262,6 @@
 
       const watched = data.episodes.filter(e => e.watched).length;
       const total = data.episodes.length;
-      const pct = total > 0 ? Math.round(watched/total*100) : 0;
 
       function epRowHTML(ep) {
         const st = epState[ep.episode_number];
@@ -1262,6 +1277,10 @@
             <button class="ep-edit-btn" data-edit="${ep.episode_number}" title="${st.watched?'Edit date':'Log with date'}">✏</button>
           </div>`;
       }
+
+      const headerSegBar = segBarHTML(data.episodes.map(function(e) {
+        return { number: e.episode_number, watched: e.watched };
+      }));
 
       app.innerHTML = `
         <div class="page">
@@ -1280,9 +1299,7 @@
               <h1 style="font-size:1.4rem;font-weight:700;color:var(--accent);margin-bottom:0.2rem">${esc(data.name||`Season ${seasonNum}`)}</h1>
               <div style="color:var(--tx-dim);font-size:0.82rem">${data.air_date?data.air_date+' · ':''}${total} episodes</div>
               <div class="progress-row" style="margin-top:0.5rem" id="prog-text">${watched} / ${total} watched</div>
-              <div class="progress-bar" style="max-width:220px;margin-top:0.3rem" id="prog-bar">
-                <div class="progress-fill" id="prog-fill" style="width:${pct}%"></div>
-              </div>
+              <div id="prog-bar" style="max-width:220px;margin-top:0.3rem">${headerSegBar}</div>
               <div id="season-providers"></div>
             </div>
           </div>
@@ -1307,11 +1324,8 @@
 
       function updateProgress() {
         const w = Object.values(epState).filter(s => s.watched).length;
-        const p = total > 0 ? Math.round(w/total*100) : 0;
         const pt = app.querySelector('#prog-text');
-        const pf = app.querySelector('#prog-fill');
         if (pt) pt.textContent = `${w} / ${total} watched`;
-        if (pf) pf.style.width = p + '%';
       }
 
       function updateRow(epNum) {
@@ -1329,6 +1343,9 @@
           d.className = 'ep-watched-at'; d.textContent = st.watched_at;
           row.querySelector('.ep-edit-btn').before(d);
         }
+        // Update header bar segment
+        const seg = app.querySelector('#prog-bar .seg[data-seg="' + epNum + '"]');
+        if (seg) seg.classList.toggle('w', st.watched);
       }
 
       // Episode list events
