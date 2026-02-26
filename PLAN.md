@@ -65,16 +65,16 @@ Note: "hiatus" is derived (not stored) — airing + caught up + no new eps = bet
 - `done`      → `finished`  (done = finished watching)
 
 **Backend todos:**
-- [ ] `backend/main.py`: add startup migration SQL (safe to re-run; WHERE clause scoped to old values)
-- [ ] `backend/routers/shows.py`: update `_VALID_STATUSES` to `{"airing","watching","finished","watchlist","abandoned"}`
-- [ ] `backend/routers/schedule.py`: replace `"binging"` with `"watching"` (3 occurrences)
-- [ ] `backend/import_trakt.py`: replace `"done"` with `"finished"` in auto-status assignment
-- [ ] `backend/models.py`: update `user_status` column comment
+- [x] `backend/main.py`: add startup migration SQL (safe to re-run; WHERE clause scoped to old values)
+- [x] `backend/routers/shows.py`: update `_VALID_STATUSES` to `{"airing","watching","finished","watchlist","abandoned"}`
+- [x] `backend/routers/schedule.py`: replace `"binging"` with `"watching"` (3 occurrences)
+- [x] `backend/import_trakt.py`: replace `"done"` with `"finished"` in auto-status assignment
+- [x] `backend/models.py`: update `user_status` column comment
 
 **Frontend todos:**
-- [ ] Update `STATUS_LABEL` constant (5 entries; `watchlist` and `finished` replace old values)
-- [ ] `pageLibrary()`: update groups dict, order, and section colors for 5 sections
-- [ ] `pageShow()`: status buttons update automatically from `STATUS_LABEL` (no structural change)
+- [x] Update `STATUS_LABEL` constant (5 entries; `watchlist` and `finished` replace old values)
+- [x] `pageLibrary()`: update groups dict, order, and section colors for 5 sections
+- [x] `pageShow()`: status buttons update automatically from `STATUS_LABEL` (no structural change)
 
 ### Multiple watch dates
 - The DB currently allows one watched_at per episode. Rewatching needs multiple.
@@ -139,6 +139,7 @@ Three modes settable per show:
 - [ ] Replace horizontal-scroll cast grids with wrapping grid option. This is because the actor and character names get cut off easily.
 - [ ] Visual redesign — less utilitarian
 - [ ] Show years in the appropriate places
+- [ ] Watch History should be hidden utill asked for, ie not front and center on the page.
 
 ---
 
@@ -168,6 +169,7 @@ Three modes settable per show:
 
 ## Other Features (To Be Categorized)
 - [ ] On a person page, divide their things I've seen them in into main character vs guest
+- [ ] If they're a guest, link to the specific episode
 - [ ] Fix Add to Library 500 Internal Server Error
 - [ ] Import old watchlists from Trakt
 

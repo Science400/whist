@@ -415,6 +415,7 @@
     .ep-title { font-size: 0.875rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .ep-air-date { font-size: 0.72rem; color: var(--tx-dim); flex-shrink: 0; }
     .ep-watched-at { font-size: 0.72rem; color: var(--accent); flex-shrink: 0; }
+    .ep-watch-count { font-size: 0.72rem; color: var(--tx-dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
     .ep-edit-btn {
       flex-shrink: 0; width: 28px; height: 28px;
       display: flex; align-items: center; justify-content: center;
@@ -556,7 +557,9 @@
       min-width: 250px; max-width: 320px; width: 100%;
       box-shadow: 0 12px 40px rgba(0,0,0,0.5);
     }
-    .popover h3 { font-size: 0.95rem; margin-bottom: 1rem; color: var(--tx); }
+    .popover h3 { font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--tx); }
+    .wh-entry { display: flex; align-items: center; justify-content: space-between; padding: 0.3rem 0; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
+    .wh-entry:last-child { border-bottom: none; }
     .popover-opts { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem; }
     .popover-opt {
       display: flex; align-items: center; gap: 0.75rem;
@@ -679,6 +682,7 @@
     const get   = p       => api('GET', p);
     const post  = (p, b)  => api('POST', p, b);
     const patch = (p, b)  => api('PATCH', p, b);
+    const del   = p       => api('DELETE', p);
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     function esc(s) {
@@ -904,6 +908,65 @@
         onSave(d);
       };
       ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+      document.body.appendChild(ov);
+    }
+
+    function showWatchHistory(tmdbId, seasonNum, epNum, title, onChanged) {
+      const ov = document.createElement('div');
+      ov.className = 'popover-overlay';
+      ov.innerHTML =
+        '<div class="popover">' +
+          '<h3>Watch History</h3>' +
+          '<div class="wh-title" style="color:var(--tx-dim);font-size:0.85rem;margin-bottom:0.75rem">' + esc(title) + '</div>' +
+          '<div id="_wh_list"><div class="loading">Loading\u2026</div></div>' +
+          '<div class="popover-actions">' +
+            '<button class="btn btn-outline btn-sm" id="_wh_add">+ Log Watch</button>' +
+            '<button class="btn btn-ghost btn-sm" id="_wh_close">Close</button>' +
+          '</div>' +
+        '</div>';
+
+      function renderList(entries) {
+        const list = ov.querySelector('#_wh_list');
+        if (!entries.length) {
+          list.innerHTML = '<div style="color:var(--tx-dim);font-size:0.85rem;padding:0.5rem 0">No history yet.</div>';
+          return;
+        }
+        let html = '';
+        entries.forEach(function(e) {
+          html += '<div class="wh-entry">' +
+            '<span>' + (e.watched_at || 'date unknown') + '</span>' +
+            '<button class="btn btn-ghost btn-sm wh-delete" data-id="' + e.id + '" title="Remove">\u2715</button>' +
+            '</div>';
+        });
+        list.innerHTML = html;
+        list.querySelectorAll('.wh-delete').forEach(function(btn) {
+          btn.addEventListener('click', async function() {
+            const id = +btn.dataset.id;
+            const res = await del('/episodes/history/' + id);
+            onChanged && onChanged(res);
+            if (res.watch_count === 0) { ov.remove(); return; }
+            const updated = await get('/shows/' + tmdbId + '/season/' + seasonNum + '/episode/' + epNum + '/watch-history');
+            renderList(updated.entries);
+          });
+        });
+      }
+
+      get('/shows/' + tmdbId + '/season/' + seasonNum + '/episode/' + epNum + '/watch-history')
+        .then(function(d) { renderList(d.entries); });
+
+      ov.querySelector('#_wh_add').addEventListener('click', function() {
+        showDatePicker(title, null, async function(d) {
+          const res = await post('/episodes/watched', {
+            tmdb_show_id: tmdbId, season_number: seasonNum,
+            episode_number: epNum, watched: true, watched_at: d,
+          });
+          onChanged && onChanged(res);
+          const updated = await get('/shows/' + tmdbId + '/season/' + seasonNum + '/episode/' + epNum + '/watch-history');
+          renderList(updated.entries);
+        });
+      });
+      ov.querySelector('#_wh_close').addEventListener('click', function() { ov.remove(); });
+      ov.addEventListener('click', function(e) { if (e.target === ov) ov.remove(); });
       document.body.appendChild(ov);
     }
 
@@ -1350,7 +1413,7 @@
 
       // Local mutable state so we can update rows without full re-fetch
       const epState = {};
-      data.episodes.forEach(ep => { epState[ep.episode_number] = { watched: ep.watched, watched_at: ep.watched_at, title: ep.title }; });
+      data.episodes.forEach(ep => { epState[ep.episode_number] = { watched: ep.watched, watched_at: ep.watched_at, watch_count: ep.watch_count || 0, title: ep.title }; });
 
       const watched = data.episodes.filter(e => e.watched).length;
       const total = data.episodes.length;
@@ -1366,7 +1429,8 @@
             </div>
             ${ep.air_date?`<div class="ep-air-date">${ep.air_date}</div>`:''}
             ${st.watched&&st.watched_at?`<div class="ep-watched-at">${st.watched_at}</div>`:''}
-            <button class="ep-edit-btn" data-edit="${ep.episode_number}" title="${st.watched?'Edit date':'Log with date'}">✏</button>
+            ${st.watch_count>1?`<div class="ep-watch-count">\xd7${st.watch_count}</div>`:''}
+            <button class="ep-edit-btn" data-edit="${ep.episode_number}" title="${st.watched?'Watch history':'Log with date'}">✏</button>
           </div>`;
       }
 
@@ -1427,13 +1491,20 @@
         const check = row.querySelector('[data-check]');
         if (st.watched) { check.classList.add('watched'); check.textContent = '✓'; }
         else { check.classList.remove('watched'); check.textContent = ''; }
-        // Update watched_at
+        // Update watched_at and watch count badge
         const old = row.querySelector('.ep-watched-at');
         if (old) old.remove();
+        const oldBadge = row.querySelector('.ep-watch-count');
+        if (oldBadge) oldBadge.remove();
         if (st.watched && st.watched_at) {
           const d = document.createElement('div');
           d.className = 'ep-watched-at'; d.textContent = st.watched_at;
           row.querySelector('.ep-edit-btn').before(d);
+        }
+        if (st.watch_count > 1) {
+          const b = document.createElement('div');
+          b.className = 'ep-watch-count'; b.textContent = '\xd7' + st.watch_count;
+          row.querySelector('.ep-edit-btn').before(b);
         }
         // Update header bar segment
         const seg = app.querySelector('#prog-bar .seg[data-seg="' + epNum + '"]');
@@ -1455,7 +1526,7 @@
           const epNum = +check.dataset.check;
           const newWatched = !epState[epNum].watched;
           const prevState = { ...epState[epNum] };
-          epState[epNum] = { ...epState[epNum], watched: newWatched, watched_at: newWatched ? today() : null };
+          epState[epNum] = { ...epState[epNum], watched: newWatched, watched_at: newWatched ? today() : null, watch_count: newWatched ? 1 : 0 };
           updateRow(epNum); updateProgress();
           try {
             await post('/episodes/watched', {
@@ -1471,16 +1542,31 @@
         if (editBtn) {
           const epNum = +editBtn.dataset.edit;
           const st = epState[epNum];
-          showDatePicker(st.title || `Episode ${epNum}`, st.watched_at, async d => {
-            try {
-              await post('/episodes/watched', {
-                tmdb_show_id: tmdbId, season_number: seasonNum,
-                episode_number: epNum, watched: true, watched_at: d,
-              });
-              epState[epNum] = { ...epState[epNum], watched: true, watched_at: d };
-              updateRow(epNum); updateProgress();
-            } catch(err) { alert('Error: ' + err.message); }
-          });
+          if (st.watched) {
+            // Open watch history popover
+            showWatchHistory(tmdbId, seasonNum, epNum, st.title || ('Episode ' + epNum), res => {
+              if (res.watch_count !== undefined) {
+                epState[epNum] = { ...epState[epNum], watch_count: res.watch_count };
+                if (res.watched !== undefined) epState[epNum].watched = res.watched;
+                if (res.watched_at !== undefined) epState[epNum].watched_at = res.watched_at;
+              } else {
+                // res is from POST /episodes/watched (new entry added)
+                epState[epNum] = { ...epState[epNum], watch_count: res.watch_count, watched: true, watched_at: res.watched_at || epState[epNum].watched_at };
+              }
+              updateRow(epNum);
+            });
+          } else {
+            showDatePicker(st.title || ('Episode ' + epNum), st.watched_at, async d => {
+              try {
+                await post('/episodes/watched', {
+                  tmdb_show_id: tmdbId, season_number: seasonNum,
+                  episode_number: epNum, watched: true, watched_at: d,
+                });
+                epState[epNum] = { ...epState[epNum], watched: true, watched_at: d, watch_count: 1 };
+                updateRow(epNum); updateProgress();
+              } catch(err) { alert('Error: ' + err.message); }
+            });
+          }
         }
       });
 
@@ -1534,11 +1620,12 @@
           <div class="ep-watch-row" id="watch-row">
             ${ep.watched
               ? `<span style="color:var(--accent);font-size:0.9rem">✓ Watched${ep.watched_at?' · '+ep.watched_at:''}</span>
-                 <button class="btn btn-ghost btn-sm" id="ep-edit-date">✏ Edit date</button>
+                 <button class="btn btn-outline btn-sm" id="ep-log-rewatch">+ Log Rewatch</button>
                  <button class="btn btn-ghost btn-sm" id="ep-unwatch" style="color:var(--tx-dim)">Unwatch</button>`
               : `<button class="btn btn-accent" id="ep-watch">Mark Watched</button>
                  <button class="btn btn-outline btn-sm" id="ep-watch-date">Log with date</button>`}
           </div>
+          ${ep.watched ? '<div id="ep-watch-history" style="margin-bottom:1rem"><div class="loading" style="font-size:0.85rem;padding:0.5rem 0">Loading history\u2026</div></div>' : ''}
           <div id="ep-providers"></div>
           ${ep.overview?`<p style="color:var(--tx-dim);line-height:1.7;margin-bottom:2rem">${esc(ep.overview)}</p>`:''}
           <div id="ep-cast-section"><div class="loading" style="padding:1rem 0;text-align:left">Loading cast…</div></div>
@@ -1563,8 +1650,8 @@
           rerender();
         });
       });
-      app.querySelector('#ep-edit-date')?.addEventListener('click', () => {
-        showDatePicker(ep.title||`Episode ${epNum}`, ep.watched_at, async d => {
+      app.querySelector('#ep-log-rewatch')?.addEventListener('click', () => {
+        showDatePicker(ep.title||('Episode ' + epNum), null, async d => {
           await post('/episodes/watched', { tmdb_show_id: tmdbId, season_number: seasonNum, episode_number: epNum, watched: true, watched_at: d });
           rerender();
         });
@@ -1573,6 +1660,35 @@
         await post('/episodes/watched', { tmdb_show_id: tmdbId, season_number: seasonNum, episode_number: epNum, watched: false });
         rerender();
       });
+
+      // Load watch history (non-blocking)
+      if (ep.watched) {
+        get('/shows/' + tmdbId + '/season/' + seasonNum + '/episode/' + epNum + '/watch-history').then(function(d) {
+          const sec = app.querySelector('#ep-watch-history');
+          if (!sec) return;
+          if (!d.entries.length) { sec.innerHTML = ''; return; }
+          let html = '<div style="margin-bottom:0.5rem;font-size:0.8rem;font-weight:600;color:var(--tx-dim);text-transform:uppercase;letter-spacing:0.05em">Watch History</div>';
+          d.entries.forEach(function(e) {
+            html += '<div class="wh-entry" data-id="' + e.id + '">' +
+              '<span>' + (e.watched_at || 'date unknown') + '</span>' +
+              '<button class="btn btn-ghost btn-sm wh-delete" data-id="' + e.id + '" title="Remove">\u2715</button>' +
+              '</div>';
+          });
+          sec.innerHTML = html;
+          sec.querySelectorAll('.wh-delete').forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+              const res = await del('/episodes/history/' + btn.dataset.id);
+              if (!res.watched) { rerender(); return; }
+              const updated = await get('/shows/' + tmdbId + '/season/' + seasonNum + '/episode/' + epNum + '/watch-history');
+              sec.querySelector('.wh-delete[data-id="' + btn.dataset.id + '"]')?.closest('.wh-entry')?.remove();
+              if (!updated.entries.length) sec.innerHTML = '';
+            });
+          });
+        }).catch(function() {
+          const sec = app.querySelector('#ep-watch-history');
+          if (sec) sec.innerHTML = '';
+        });
+      }
 
       // Load episode cast (non-blocking)
       get(`/shows/${tmdbId}/season/${seasonNum}/episode/${epNum}/cast`).then(castData => {

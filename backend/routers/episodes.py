@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -117,10 +117,26 @@ async def get_season_detail(
         ).scalars().all()
     }
 
+    # Pull watch counts and most-recent dates from watch_history
+    history_rows = db.execute(
+        select(
+            models.WatchHistory.episode_number,
+            func.count().label("watch_count"),
+            func.max(models.WatchHistory.watched_at).label("last_watched_at"),
+        )
+        .where(
+            models.WatchHistory.tmdb_show_id == tmdb_show_id,
+            models.WatchHistory.season_number == season_number,
+        )
+        .group_by(models.WatchHistory.episode_number)
+    ).all()
+    history_map = {r.episode_number: r for r in history_rows}
+
     episodes = []
     for ep in season_data.get("episodes", []):
         ep_num = ep.get("episode_number")
         local = episodes_db.get(ep_num)
+        hist = history_map.get(ep_num)
         episodes.append({
             "episode_number": ep_num,
             "title": ep.get("name"),
@@ -128,7 +144,8 @@ async def get_season_detail(
             "overview": ep.get("overview"),
             "still_path": ep.get("still_path"),
             "watched": local.watched if local else False,
-            "watched_at": local.watched_at if local else None,
+            "watched_at": hist.last_watched_at if hist else (local.watched_at if local else None),
+            "watch_count": hist.watch_count if hist else (1 if local and local.watched else 0),
         })
 
     return {
@@ -252,7 +269,11 @@ def _resolve_date(watched_at: str | None) -> str | None:
 
 @router.post("/episodes/watched")
 def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_db)):
-    """Mark a single episode watched or unwatched."""
+    """Mark a single episode watched or unwatched.
+
+    watched=True: insert a new watch_history entry (always appends — supports rewatches).
+    watched=False: delete all watch_history entries for this episode and clear the episode.
+    """
     ep = db.execute(
         select(models.Episode).where(
             models.Episode.tmdb_show_id == body.tmdb_show_id,
@@ -266,16 +287,42 @@ def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_db)):
             detail="Episode not found — open the Episodes panel first to cache them",
         )
 
-    ep.watched = body.watched
-    ep.watched_at = _resolve_date(body.watched_at) if body.watched else None
-
     if body.watched:
+        resolved = _resolve_date(body.watched_at)
+        db.add(models.WatchHistory(
+            tmdb_show_id=body.tmdb_show_id,
+            season_number=body.season_number,
+            episode_number=body.episode_number,
+            watched_at=resolved,
+        ))
+        ep.watched = True
+        # Keep watched_at as the most-recent date
+        if resolved and (ep.watched_at is None or resolved > ep.watched_at):
+            ep.watched_at = resolved
         show = db.get(models.Show, ep.show_id)
         if show:
             show.last_watched_at = datetime.now(timezone.utc).isoformat()
+    else:
+        db.execute(
+            delete(models.WatchHistory).where(
+                models.WatchHistory.tmdb_show_id == body.tmdb_show_id,
+                models.WatchHistory.season_number == body.season_number,
+                models.WatchHistory.episode_number == body.episode_number,
+            )
+        )
+        ep.watched = False
+        ep.watched_at = None
 
     db.commit()
-    return {"watched": ep.watched, "watched_at": ep.watched_at}
+
+    watch_count = db.execute(
+        select(func.count()).select_from(models.WatchHistory).where(
+            models.WatchHistory.tmdb_show_id == body.tmdb_show_id,
+            models.WatchHistory.season_number == body.season_number,
+            models.WatchHistory.episode_number == body.episode_number,
+        )
+    ).scalar()
+    return {"watched": ep.watched, "watched_at": ep.watched_at, "watch_count": watch_count}
 
 
 @router.post("/episodes/watched/bulk")
@@ -296,6 +343,12 @@ def mark_bulk_watched(body: BulkWatchedRequest, db: Session = Depends(get_db)):
     for ep in episodes:
         ep.watched = True
         ep.watched_at = resolved_date
+        db.add(models.WatchHistory(
+            tmdb_show_id=body.tmdb_show_id,
+            season_number=ep.season_number,
+            episode_number=ep.episode_number,
+            watched_at=resolved_date,
+        ))
 
     show = db.execute(
         select(models.Show).where(models.Show.tmdb_id == body.tmdb_show_id)
@@ -305,3 +358,79 @@ def mark_bulk_watched(body: BulkWatchedRequest, db: Session = Depends(get_db)):
 
     db.commit()
     return {"marked": len(episodes)}
+
+
+@router.get("/shows/{tmdb_show_id}/season/{season_number}/episode/{episode_number}/watch-history")
+def get_episode_watch_history(
+    tmdb_show_id: int, season_number: int, episode_number: int,
+    db: Session = Depends(get_db),
+):
+    """Return all watch_history entries for an episode, newest first."""
+    entries = db.execute(
+        select(models.WatchHistory)
+        .where(
+            models.WatchHistory.tmdb_show_id == tmdb_show_id,
+            models.WatchHistory.season_number == season_number,
+            models.WatchHistory.episode_number == episode_number,
+        )
+        .order_by(models.WatchHistory.watched_at.desc().nulls_last())
+    ).scalars().all()
+
+    return {
+        "entries": [{"id": e.id, "watched_at": e.watched_at} for e in entries],
+        "total": len(entries),
+    }
+
+
+@router.delete("/episodes/history/{entry_id}")
+def delete_history_entry(entry_id: int, db: Session = Depends(get_db)):
+    """Remove a single watch_history entry. Re-syncs episodes.watched/watched_at."""
+    entry = db.get(models.WatchHistory, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="History entry not found")
+
+    tmdb_show_id   = entry.tmdb_show_id
+    season_number  = entry.season_number
+    episode_number = entry.episode_number
+
+    db.delete(entry)
+    db.flush()
+
+    # Re-sync the episode row
+    ep = db.execute(
+        select(models.Episode).where(
+            models.Episode.tmdb_show_id == tmdb_show_id,
+            models.Episode.season_number == season_number,
+            models.Episode.episode_number == episode_number,
+        )
+    ).scalar_one_or_none()
+
+    if ep:
+        remaining = db.execute(
+            select(models.WatchHistory)
+            .where(
+                models.WatchHistory.tmdb_show_id == tmdb_show_id,
+                models.WatchHistory.season_number == season_number,
+                models.WatchHistory.episode_number == episode_number,
+            )
+            .order_by(models.WatchHistory.watched_at.desc().nulls_last())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if remaining:
+            ep.watched = True
+            ep.watched_at = remaining.watched_at
+        else:
+            ep.watched = False
+            ep.watched_at = None
+
+    db.commit()
+
+    watch_count = db.execute(
+        select(func.count()).select_from(models.WatchHistory).where(
+            models.WatchHistory.tmdb_show_id == tmdb_show_id,
+            models.WatchHistory.season_number == season_number,
+            models.WatchHistory.episode_number == episode_number,
+        )
+    ).scalar()
+    return {"deleted": True, "watch_count": watch_count, "watched": ep.watched if ep else False}

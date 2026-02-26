@@ -75,6 +75,20 @@ class PersonCredit(Base):
     person = relationship("Person", back_populates="credits")
 
 
+class WatchHistory(Base):
+    __tablename__ = "watch_history"
+    __table_args__ = (
+        Index("ix_watch_history_episode",
+              "tmdb_show_id", "season_number", "episode_number"),
+    )
+
+    id             = Column(Integer, primary_key=True, index=True)
+    tmdb_show_id   = Column(Integer, nullable=False)
+    season_number  = Column(Integer, nullable=False)
+    episode_number = Column(Integer, nullable=False)
+    watched_at     = Column(String)  # YYYY-MM-DD or None
+
+
 class ShowCast(Base):
     __tablename__ = "show_cast"
     __table_args__ = (

@@ -48,6 +48,32 @@ def _run_migrations() -> None:
             SET watched_at = substr(watched_at, 1, 10)
             WHERE watched_at IS NOT NULL AND length(watched_at) > 10
         """))
+        # Migration 5: create watch_history table and backfill from episodes.watched_at
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS watch_history (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                tmdb_show_id   INTEGER NOT NULL,
+                season_number  INTEGER NOT NULL,
+                episode_number INTEGER NOT NULL,
+                watched_at     TEXT
+            )
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_watch_history_episode
+                ON watch_history (tmdb_show_id, season_number, episode_number)
+        """))
+        conn.execute(text("""
+            INSERT INTO watch_history (tmdb_show_id, season_number, episode_number, watched_at)
+            SELECT tmdb_show_id, season_number, episode_number, watched_at
+            FROM episodes
+            WHERE watched = 1
+              AND NOT EXISTS (
+                SELECT 1 FROM watch_history wh
+                WHERE wh.tmdb_show_id   = episodes.tmdb_show_id
+                  AND wh.season_number  = episodes.season_number
+                  AND wh.episode_number = episodes.episode_number
+              )
+        """))
         conn.commit()
 
 
