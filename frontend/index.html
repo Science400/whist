@@ -195,6 +195,25 @@
       border-radius: 10px; padding: 0.1rem 0.45rem; font-size: 0.72rem;
     }
 
+    /* ── Library search + sort controls ────────────────────────────────── */
+    .library-controls {
+      display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .library-controls input[type="search"] {
+      flex: 1; min-width: 160px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--tx); padding: 0.4rem 0.65rem;
+      font-size: 0.85rem; outline: none;
+    }
+    .library-controls input[type="search"]::placeholder { color: var(--tx-dim); }
+    .library-controls input[type="search"]:focus { border-color: var(--accent); }
+    .library-controls select {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--tx); padding: 0.4rem 0.65rem;
+      font-size: 0.85rem; cursor: pointer; outline: none;
+    }
+
     /* ── Show detail header ─────────────────────────────────────────────── */
     .show-backdrop {
       width: 100%; aspect-ratio: 16/9; max-height: 300px;
@@ -1006,53 +1025,126 @@
         return;
       }
 
-      const groups = { airing: [], binging: [], caught_up: [], done: [] };
-      for (const s of shows) groups[s.user_status] ? groups[s.user_status].push(s) : groups.done.push(s);
-
-      const order = ['airing', 'binging', 'caught_up', 'done'];
-      const sectionColors = { airing: 'var(--orange)', binging: 'var(--yellow)', caught_up: 'var(--cyan)', done: 'var(--muted)' };
-
-      let body = order.filter(k => groups[k].length).map(k => `
-        <div class="section">
-          <div class="section-header">
-            <h2 style="color:${sectionColors[k]}">${STATUS_LABEL[k]}</h2>
-            <span class="section-count">${groups[k].length}</span>
-          </div>
-          <div class="poster-grid">${groups[k].map(posterCardHTML).join('')}</div>
-        </div>`).join('');
-
-      if (!shows.length) body = `
-        <div class="empty-state">
-          <h3>No shows tracked yet</h3>
-          <p>Add some shows to get started.</p>
-          <button class="btn btn-accent" style="margin-top:1rem" data-nav="/add">+ Add Show</button>
-        </div>`;
-
+      // Render outer shell once — controls persist across re-renders
       app.innerHTML = `
         <div class="page">
           <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem">
             <div>
               <h1>My Library</h1>
-              <p>${shows.length} show${shows.length!==1?'s':''} tracked</p>
+              <p id="lib-count">${shows.length} show${shows.length!==1?'s':''} tracked</p>
             </div>
             <button class="btn btn-accent" data-nav="/add">+ Add Show</button>
           </div>
-          ${body}
+          <div class="library-controls">
+            <input type="search" id="lib-search" placeholder="Search shows…" autocomplete="off">
+            <select id="lib-sort">
+              <option value="default">Last watched</option>
+              <option value="alpha-asc">A → Z</option>
+              <option value="alpha-desc">Z → A</option>
+              <option value="progress-hi">Progress ↓</option>
+              <option value="progress-lo">Progress ↑</option>
+            </select>
+          </div>
+          <div id="lib-body"></div>
         </div>`;
       bindNav(app);
 
-      // Upgrade poster card bars to segmented episode bars (non-blocking, one request per show).
-      // Shows the solid percentage fill first, then replaces with detailed segments once loaded.
-      shows.forEach(function(show) {
-        get('/shows/' + show.tmdb_id + '/season-progress').then(function(seasons) {
-          const el = app.querySelector('[data-seg-card="' + show.tmdb_id + '"]');
+      const searchInput = app.querySelector('#lib-search');
+      const sortSelect  = app.querySelector('#lib-sort');
+      const bodyEl      = app.querySelector('#lib-body');
+      const countEl     = app.querySelector('#lib-count');
+
+      const segCache = {}; // tmdb_id -> segBarHTML string ('' if no episodes)
+      const order = ['airing', 'binging', 'caught_up', 'done'];
+      const sectionColors = { airing: 'var(--orange)', binging: 'var(--yellow)', caught_up: 'var(--cyan)', done: 'var(--muted)' };
+
+      function renderGrid() {
+        const q  = searchInput.value.toLowerCase().trim();
+        const sv = sortSelect.value;
+
+        // Filter by search query
+        const filtered = q ? shows.filter(function(s) { return s.title.toLowerCase().includes(q); }) : shows;
+
+        // Sort (filtered is already in server order = last watched)
+        const sorted = filtered.slice();
+        if (sv === 'alpha-asc') {
+          sorted.sort(function(a, b) { return a.title.localeCompare(b.title); });
+        } else if (sv === 'alpha-desc') {
+          sorted.sort(function(a, b) { return b.title.localeCompare(a.title); });
+        } else if (sv === 'progress-hi') {
+          sorted.sort(function(a, b) {
+            const pa = a.total_count ? a.watched_count / a.total_count : 0;
+            const pb = b.total_count ? b.watched_count / b.total_count : 0;
+            return pb - pa;
+          });
+        } else if (sv === 'progress-lo') {
+          sorted.sort(function(a, b) {
+            const pa = a.total_count ? a.watched_count / a.total_count : 0;
+            const pb = b.total_count ? b.watched_count / b.total_count : 0;
+            return pa - pb;
+          });
+        }
+
+        // Group into status sections
+        const groups = { airing: [], binging: [], caught_up: [], done: [] };
+        sorted.forEach(function(s) {
+          (groups[s.user_status] ? groups[s.user_status] : groups.done).push(s);
+        });
+
+        // Render
+        let html = '';
+        if (!sorted.length) {
+          html = q
+            ? '<div class="empty-state"><p>No shows matching \u201c' + esc(q) + '\u201d</p></div>'
+            : '<div class="empty-state"><h3>No shows tracked yet</h3><p>Add some shows to get started.</p><button class="btn btn-accent" style="margin-top:1rem" data-nav="/add">+ Add Show</button></div>';
+        } else {
+          html = order.filter(function(k) { return groups[k].length; }).map(function(k) {
+            return '<div class="section">'
+              + '<div class="section-header">'
+              + '<h2 style="color:' + sectionColors[k] + '">' + STATUS_LABEL[k] + '</h2>'
+              + '<span class="section-count">' + groups[k].length + '</span>'
+              + '</div>'
+              + '<div class="poster-grid">' + groups[k].map(posterCardHTML).join('') + '</div>'
+              + '</div>';
+          }).join('');
+        }
+
+        bodyEl.innerHTML = html;
+        bindNav(bodyEl);
+
+        // Update count label
+        countEl.textContent = q
+          ? (sorted.length + ' of ' + shows.length + ' show' + (shows.length !== 1 ? 's' : ''))
+          : (shows.length + ' show' + (shows.length !== 1 ? 's' : '') + ' tracked');
+
+        // Inject segment bars from cache or fetch
+        sorted.forEach(function(show) {
+          const el = bodyEl.querySelector('[data-seg-card="' + show.tmdb_id + '"]');
           if (!el) return;
-          // Flatten all seasons; use sequential index so numbers don't repeat across seasons
-          const episodes = seasons.flatMap(function(s) { return s.episodes; })
-                                  .map(function(e, i) { return { number: i, watched: e.watched }; });
-          if (episodes.length) el.innerHTML = segBarHTML(episodes);
-        }).catch(function() {});
+          if (show.tmdb_id in segCache) {
+            if (segCache[show.tmdb_id]) el.innerHTML = segCache[show.tmdb_id];
+            return;
+          }
+          get('/shows/' + show.tmdb_id + '/season-progress').then(function(seasons) {
+            const episodes = seasons.flatMap(function(s) { return s.episodes; })
+                                    .map(function(e, i) { return { number: i, watched: e.watched }; });
+            const barHTML = episodes.length ? segBarHTML(episodes) : '';
+            segCache[show.tmdb_id] = barHTML;
+            const el2 = bodyEl.querySelector('[data-seg-card="' + show.tmdb_id + '"]');
+            if (el2 && barHTML) el2.innerHTML = barHTML;
+          }).catch(function() { segCache[show.tmdb_id] = ''; });
+        });
+      }
+
+      // Debounced search
+      let searchTimer;
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderGrid, 150);
       });
+      sortSelect.addEventListener('change', renderGrid);
+
+      renderGrid(); // initial render
     }
 
     // ── Page: Add Show ───────────────────────────────────────────────────────

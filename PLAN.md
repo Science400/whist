@@ -70,15 +70,16 @@ Display categories for both library and schedule (derived from status + progress
 - Add a `rewatch_log` table for secondary watches (keeps primary watch history clean).
 - UI: show most recent watch date; log icon to see full history.
 
-### Progress bars (currently broken — hardcoded to 0%)
-- `GET /shows` needs to include watched/total episode counts per show
-- Poster cards in library should show real progress
-- Season rows on the show page should show season-level progress
+### Progress bars ✓
+- [x] `GET /shows` includes watched/total episode counts per show
+- [x] Poster cards show segmented episode bars (lazy-loaded)
+- [x] Season rows on show page show segmented episode bars
+- [x] Season page header bar segmented; toggles live on check/uncheck
 
 ### Other library improvements
-- [ ] Search/filter bar (critical at 160+ shows)
-- [ ] Sort options: last watched, alphabetical, progress %, air date
-- [ ] Show episode progress % on poster cards (fix broken bars)
+- [x] Search/filter bar
+- [x] Sort options: last watched, A→Z, Z→A, progress ↓, progress ↑
+- [x] Episode progress bars on poster cards
 
 ---
 
@@ -112,7 +113,7 @@ Three modes settable per show:
 - [ ] Mobile-responsive layout (works well on phone)
 - [ ] Possibly installable as PWA (home screen shortcut; not ideal since it doesn't
       go to app drawer on Android — revisit when mobile layout is solid)
-- [ ] Replace horizontal-scroll cast grids with wrapping grid option
+- [ ] Replace horizontal-scroll cast grids with wrapping grid option. This is because the actor and character names get cut off easily.
 - [ ] Visual redesign — less utilitarian
 - [ ] Show years in the appropriate places
 
@@ -141,6 +142,10 @@ Three modes settable per show:
 - [ ] Data export (CSV or JSON) for backup
 
 ---
+
+## Other Features (To Be Categorized)
+- [ ] On a person page, divide their things I've seen them in into main character vs guest
+- [ ] Fix Add to Library 500 Internal Server Error
 
 ## Out of Scope
 - Multiple user accounts
