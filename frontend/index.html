@@ -1043,8 +1043,7 @@
           break;
         }
         cardsHTML += schedCardHTML(items[i]);
-        var cost = Math.max(1, items[i].available_count || 0);
-        remaining -= cost;
+        remaining -= 1;
       }
 
       var capBar = '<div class="schedule-cap-bar">'

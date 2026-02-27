@@ -44,13 +44,13 @@ def get_schedule_today(db: Session = Depends(get_db)):
     airing_shows = db.execute(
         select(models.Show)
         .where(models.Show.user_status == "airing")
-        .order_by(models.Show.last_watched_at.asc().nulls_last())
+        .order_by(models.Show.last_watched_at.desc().nulls_last())
     ).scalars().all()
 
     watching_shows = db.execute(
         select(models.Show)
         .where(models.Show.user_status == "watching")
-        .order_by(models.Show.last_watched_at.asc().nulls_last())
+        .order_by(models.Show.last_watched_at.desc().nulls_last())
     ).scalars().all()
 
     items = []
