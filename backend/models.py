@@ -16,7 +16,7 @@ class Show(Base):
     tmdb_id = Column(Integer, unique=True, nullable=False, index=True)
     title = Column(String, nullable=False)
     poster_path = Column(String)
-    status = Column(String)                       # legacy — use user_status
+    status = Column(String, default="")           # legacy — use user_status
     user_status = Column(String)                  # airing | watching | finished | watchlist | abandoned
     type = Column(String, nullable=False)         # tv | movie
     added_at = Column(String, default=_utcnow)
