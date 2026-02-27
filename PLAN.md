@@ -76,22 +76,23 @@ Note: "hiatus" is derived (not stored) — airing + caught up + no new eps = bet
 - [x] `pageLibrary()`: update groups dict, order, and section colors for 5 sections
 - [x] `pageShow()`: status buttons update automatically from `STATUS_LABEL` (no structural change)
 
-### Multiple watch dates
-- The DB currently allows one watched_at per episode. Rewatching needs multiple.
-- Add a `rewatch_log` table for secondary watches (keeps primary watch history clean).
-- UI: show most recent watch date; log icon to see full history.
+### Multiple watch dates ✓
+- Unified `watch_history` table holds every watch instance — no primary/secondary distinction.
+- `episodes.watched` + `episodes.watched_at` kept as a denormalized cache for fast queries.
+- UI shows most recent date; pencil/history icon opens full history.
 
 **Backend todos:**
-- [ ] Add `rewatch_log` table: `(id, tmdb_show_id, season_number, episode_number, watched_at)`
-- [ ] Write DB migration to create the table
-- [ ] Update `POST /episodes/watched` — if `watched=true` and episode already has `watched=true`, append to `rewatch_log` instead of updating `watched_at`
-- [ ] New `GET /shows/{id}/season/{n}/episode/{e}/watch-history` — returns all watch dates (primary + rewatches) in reverse order
-- [ ] Update season endpoint to include `rewatch_count` per episode
+- [x] Add `watch_history` table: `(id, tmdb_show_id, season_number, episode_number, watched_at)`
+- [x] Migration 5: create table + backfill from existing `episodes.watched_at` (idempotent)
+- [x] Update `POST /episodes/watched` — always appends to `watch_history` (supports rewatches); `watched=false` clears all history entries
+- [x] New `GET /shows/{id}/season/{n}/episode/{e}/watch-history` — all watch dates newest-first
+- [x] New `DELETE /episodes/history/{id}` — remove single entry, re-syncs episode state
+- [x] Update season endpoint to include `watch_count` and most-recent `watched_at` per episode
 
 **Frontend todos:**
-- [ ] Season page: show rewatch count badge (e.g. "×3") on multi-watched episode rows
-- [ ] Season page: log icon on episode rows that opens a simple watch-history popover
-- [ ] Episode detail page: show full watch history list
+- [x] Season page: `×N` badge on multi-watched episode rows
+- [x] Season page: pencil on watched row opens watch-history popover (list + add/delete)
+- [x] Episode detail page: "+ Log Rewatch" button + watch history section with delete
 
 ### Progress bars ✓
 - [x] `GET /shows` includes watched/total episode counts per show
@@ -124,6 +125,15 @@ Three modes settable per show:
 - Configurable total episode limit for the day's schedule
 - When the cap is hit, stop adding more — prevents overwhelming queues
 - Shows near the cap threshold get priority by last-watched date
+
+### Active season floor ✓
+- Schedule surfaces episodes from the highest season the user has started (≥1 watched ep),
+  skipping old unstarted seasons automatically. Falls back to S1 for brand-new shows.
+
+### Staleness filtering ✓
+- `airing` and `watching` shows idle for 3+ months are hidden from the schedule.
+- `watching` shows idle for 6+ months are auto-switched to `abandoned` on schedule load.
+- Timestamp format handled: `last_watched_at` stored as full ISO string, sliced to `YYYY-MM-DD` for comparison.
 
 ### Other schedule items
 - [ ] Upcoming episode calendar — what's airing this week/month

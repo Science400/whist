@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -53,6 +53,20 @@ def get_schedule_today(db: Session = Depends(get_db)):
     """
     tod           = date.today().isoformat()
     cutoff_weekly = (date.today() - timedelta(days=7)).isoformat()
+    cutoff_3mo    = (date.today() - timedelta(days=90)).isoformat()
+    cutoff_6mo    = (date.today() - timedelta(days=180)).isoformat()
+
+    # Auto-abandon watching shows idle for 6+ months
+    db.execute(
+        update(models.Show)
+        .where(
+            models.Show.user_status == "watching",
+            models.Show.last_watched_at.isnot(None),
+            func.substr(models.Show.last_watched_at, 1, 10) < cutoff_6mo,
+        )
+        .values(user_status="abandoned")
+    )
+    db.commit()
 
     airing_shows = db.execute(
         select(models.Show)
@@ -70,6 +84,10 @@ def get_schedule_today(db: Session = Depends(get_db)):
 
     # --- Airing shows: include if any unwatched aired episode exists at or after active season ---
     for show in airing_shows:
+        # Skip shows idle for 3+ months
+        if show.last_watched_at and show.last_watched_at[:10] < cutoff_3mo:
+            continue
+
         floor = _active_season_floor(db, show.tmdb_id) or 1
 
         available_count = db.execute(
@@ -106,6 +124,10 @@ def get_schedule_today(db: Session = Depends(get_db)):
     for show in watching_shows:
         pace = show.watch_pace or "binge"
         lwa  = show.last_watched_at
+
+        # Skip shows idle for 3+ months (not abandoned yet, but off the schedule)
+        if lwa and lwa[:10] < cutoff_3mo:
+            continue
 
         # Weekly pace: skip if watched within the last 7 days
         if pace == "weekly" and lwa and lwa >= cutoff_weekly:
