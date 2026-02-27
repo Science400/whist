@@ -30,13 +30,26 @@ def _ep_card(show: models.Show, ep: models.Episode, available_count: int, sugges
     }
 
 
+def _active_season_floor(db: Session, tmdb_show_id: int) -> int | None:
+    """Return the highest season the user has started (≥1 watched ep), or None."""
+    return db.execute(
+        select(func.max(models.Episode.season_number))
+        .where(
+            models.Episode.tmdb_show_id == tmdb_show_id,
+            models.Episode.watched == True,  # noqa: E712
+        )
+    ).scalar_one_or_none()
+
+
 @router.get("/today")
 def get_schedule_today(db: Session = Depends(get_db)):
     """
     Return a single ordered list of shows to watch today.
 
     Airing shows (with unwatched aired episodes) come first, then watching shows
-    (filtered by pace setting). Within each group, sorted by least-recently-watched first.
+    (filtered by pace setting). Within each group, sorted by most-recently-watched first.
+    Episodes are surfaced from the active season onward (highest season with a watched
+    episode), so old unstarted seasons are skipped automatically.
     """
     tod           = date.today().isoformat()
     cutoff_weekly = (date.today() - timedelta(days=7)).isoformat()
@@ -55,12 +68,15 @@ def get_schedule_today(db: Session = Depends(get_db)):
 
     items = []
 
-    # --- Airing shows: include if any unwatched aired episode exists ---
+    # --- Airing shows: include if any unwatched aired episode exists at or after active season ---
     for show in airing_shows:
+        floor = _active_season_floor(db, show.tmdb_id) or 1
+
         available_count = db.execute(
             select(func.count()).select_from(models.Episode)
             .where(
                 models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
                 models.Episode.air_date.isnot(None),
                 models.Episode.air_date <= tod,
@@ -74,6 +90,7 @@ def get_schedule_today(db: Session = Depends(get_db)):
             select(models.Episode)
             .where(
                 models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
                 models.Episode.air_date.isnot(None),
                 models.Episode.air_date <= tod,
@@ -85,7 +102,7 @@ def get_schedule_today(db: Session = Depends(get_db)):
         if next_ep:
             items.append(_ep_card(show, next_ep, available_count, 0))
 
-    # --- Watching shows: filtered by pace setting ---
+    # --- Watching shows: filtered by pace setting, from active season onward ---
     for show in watching_shows:
         pace = show.watch_pace or "binge"
         lwa  = show.last_watched_at
@@ -94,10 +111,13 @@ def get_schedule_today(db: Session = Depends(get_db)):
         if pace == "weekly" and lwa and lwa >= cutoff_weekly:
             continue
 
+        floor = _active_season_floor(db, show.tmdb_id) or 1
+
         next_ep = db.execute(
             select(models.Episode)
             .where(
                 models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
             )
             .order_by(models.Episode.season_number, models.Episode.episode_number)
