@@ -10,13 +10,14 @@ from backend import models
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
-def _ep_card(show: models.Show, ep: models.Episode, new_count: int) -> dict:
+def _ep_card(show: models.Show, ep: models.Episode, available_count: int, suggested_count: int) -> dict:
     return {
         "show": {
             "tmdb_id": show.tmdb_id,
             "title": show.title,
             "poster_path": show.poster_path,
             "user_status": show.user_status,
+            "watch_pace": show.watch_pace or "binge",
         },
         "next_episode": {
             "season_number": ep.season_number,
@@ -24,115 +25,87 @@ def _ep_card(show: models.Show, ep: models.Episode, new_count: int) -> dict:
             "title": ep.title,
             "air_date": ep.air_date,
         },
-        "new_count": new_count,
+        "available_count": available_count,   # >1 shows "N available" badge for airing shows
+        "suggested_count": suggested_count,   # 2 for fast pace, 0 otherwise
     }
 
 
 @router.get("/today")
 def get_schedule_today(db: Session = Depends(get_db)):
     """
-    Return four schedule sections based on user_status and watch activity.
-    Sections are mutually exclusive (priority order: airing_now → keep_watching
-    → up_next → pick_up_again).
-    """
-    tod = date.today().isoformat()
-    cutoff_new    = (date.today() - timedelta(days=7)).isoformat()   # "new" airing window
-    cutoff_active = (date.today() - timedelta(days=14)).isoformat()  # "keep watching" threshold
-    cutoff_idle   = (date.today() - timedelta(days=30)).isoformat()  # "pick up again" threshold
+    Return a single ordered list of shows to watch today.
 
-    # All tracked shows ordered by least recently watched first
-    all_shows = db.execute(
-        select(models.Show).order_by(models.Show.last_watched_at.asc().nulls_last())
+    Airing shows (with unwatched aired episodes) come first, then watching shows
+    (filtered by pace setting). Within each group, sorted by least-recently-watched first.
+    """
+    tod           = date.today().isoformat()
+    cutoff_weekly = (date.today() - timedelta(days=7)).isoformat()
+
+    airing_shows = db.execute(
+        select(models.Show)
+        .where(models.Show.user_status == "airing")
+        .order_by(models.Show.last_watched_at.asc().nulls_last())
     ).scalars().all()
 
-    airing_now    = []
-    keep_watching = []
-    up_next       = []
-    pick_up_again = []
+    watching_shows = db.execute(
+        select(models.Show)
+        .where(models.Show.user_status == "watching")
+        .order_by(models.Show.last_watched_at.asc().nulls_last())
+    ).scalars().all()
 
-    for show in all_shows:
-        status = show.user_status or ""
-        lwa    = show.last_watched_at  # ISO string or None
+    items = []
 
-        # --- Airing Now: airing shows with new unwatched eps in last 7 days ---
-        if status == "airing":
-            new_count = db.execute(
-                select(func.count()).select_from(models.Episode)
-                .where(
-                    models.Episode.tmdb_show_id == show.tmdb_id,
-                    models.Episode.watched == False,  # noqa: E712
-                    models.Episode.air_date.isnot(None),
-                    models.Episode.air_date >= cutoff_new,
-                    models.Episode.air_date <= tod,
-                )
-            ).scalar()
+    # --- Airing shows: include if any unwatched aired episode exists ---
+    for show in airing_shows:
+        available_count = db.execute(
+            select(func.count()).select_from(models.Episode)
+            .where(
+                models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.watched == False,  # noqa: E712
+                models.Episode.air_date.isnot(None),
+                models.Episode.air_date <= tod,
+            )
+        ).scalar() or 0
 
-            if new_count > 0:
-                next_ep = db.execute(
-                    select(models.Episode)
-                    .where(
-                        models.Episode.tmdb_show_id == show.tmdb_id,
-                        models.Episode.watched == False,  # noqa: E712
-                        models.Episode.air_date.isnot(None),
-                        models.Episode.air_date >= cutoff_new,
-                        models.Episode.air_date <= tod,
-                    )
-                    .order_by(models.Episode.season_number, models.Episode.episode_number)
-                    .limit(1)
-                ).scalar_one_or_none()
-                if next_ep:
-                    airing_now.append(_ep_card(show, next_ep, new_count))
-                    continue
+        if available_count == 0:
+            continue
 
-        # --- Keep Watching: watching + recently active ---
-        if status == "watching" and lwa and lwa >= cutoff_active:
-            next_ep = db.execute(
-                select(models.Episode)
-                .where(
-                    models.Episode.tmdb_show_id == show.tmdb_id,
-                    models.Episode.watched == False,  # noqa: E712
-                )
-                .order_by(models.Episode.season_number, models.Episode.episode_number)
-                .limit(1)
-            ).scalar_one_or_none()
-            if next_ep:
-                keep_watching.append(_ep_card(show, next_ep, 0))
-                continue
+        next_ep = db.execute(
+            select(models.Episode)
+            .where(
+                models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.watched == False,  # noqa: E712
+                models.Episode.air_date.isnot(None),
+                models.Episode.air_date <= tod,
+            )
+            .order_by(models.Episode.season_number, models.Episode.episode_number)
+            .limit(1)
+        ).scalar_one_or_none()
 
-        # --- Up Next: watching + idle ---
-        if status == "watching":
-            next_ep = db.execute(
-                select(models.Episode)
-                .where(
-                    models.Episode.tmdb_show_id == show.tmdb_id,
-                    models.Episode.watched == False,  # noqa: E712
-                )
-                .order_by(models.Episode.season_number, models.Episode.episode_number)
-                .limit(1)
-            ).scalar_one_or_none()
-            if next_ep:
-                up_next.append(_ep_card(show, next_ep, 0))
-                continue
+        if next_ep:
+            items.append(_ep_card(show, next_ep, available_count, 0))
 
-        # --- Pick Up Again: airing/watching, idle 30+ days, has unwatched aired eps ---
-        if status in ("airing", "watching") and lwa and lwa < cutoff_idle:
-            next_ep = db.execute(
-                select(models.Episode)
-                .where(
-                    models.Episode.tmdb_show_id == show.tmdb_id,
-                    models.Episode.watched == False,  # noqa: E712
-                    models.Episode.air_date.isnot(None),
-                    models.Episode.air_date <= tod,
-                )
-                .order_by(models.Episode.season_number, models.Episode.episode_number)
-                .limit(1)
-            ).scalar_one_or_none()
-            if next_ep:
-                pick_up_again.append(_ep_card(show, next_ep, 0))
+    # --- Watching shows: filtered by pace setting ---
+    for show in watching_shows:
+        pace = show.watch_pace or "binge"
+        lwa  = show.last_watched_at
 
-    return {
-        "airing_now":    airing_now,
-        "keep_watching": keep_watching,
-        "up_next":       up_next,
-        "pick_up_again": pick_up_again,
-    }
+        # Weekly pace: skip if watched within the last 7 days
+        if pace == "weekly" and lwa and lwa >= cutoff_weekly:
+            continue
+
+        next_ep = db.execute(
+            select(models.Episode)
+            .where(
+                models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.watched == False,  # noqa: E712
+            )
+            .order_by(models.Episode.season_number, models.Episode.episode_number)
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if next_ep:
+            suggested = 2 if pace == "fast" else 0
+            items.append(_ep_card(show, next_ep, 0, suggested))
+
+    return {"items": items}

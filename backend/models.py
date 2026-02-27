@@ -21,6 +21,7 @@ class Show(Base):
     type = Column(String, nullable=False)         # tv | movie
     added_at = Column(String, default=_utcnow)
     last_watched_at = Column(String)
+    watch_pace = Column(String, default="binge")      # binge | fast | weekly
 
     episodes = relationship("Episode", back_populates="show")
 

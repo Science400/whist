@@ -12,6 +12,7 @@ from backend import tmdb
 router = APIRouter(prefix="/shows", tags=["shows"])
 
 _VALID_STATUSES = {"airing", "watching", "finished", "watchlist", "abandoned"}
+_VALID_PACES    = {"binge", "fast", "weekly"}
 
 
 def _norm_name(name: str) -> str:
@@ -95,6 +96,10 @@ class ShowStatusRequest(BaseModel):
     user_status: str
 
 
+class ShowPaceRequest(BaseModel):
+    watch_pace: str
+
+
 class ShowResponse(BaseModel):
     id: int
     tmdb_id: int
@@ -147,6 +152,7 @@ async def get_show_detail(tmdb_id: int, db: Session = Depends(get_db)):
         "tmdb_id": tmdb_id,
         "tracked": show is not None,
         "user_status": show.user_status if show else None,
+        "watch_pace": (show.watch_pace or "binge") if show else None,
         "title": details.get("name"),
         "poster_path": details.get("poster_path"),
         "backdrop_path": details.get("backdrop_path"),
@@ -247,6 +253,24 @@ def update_show_status(tmdb_id: int, body: ShowStatusRequest, db: Session = Depe
     show.user_status = body.user_status
     db.commit()
     return {"tmdb_id": tmdb_id, "user_status": show.user_status}
+
+
+@router.patch("/{tmdb_id}/pace")
+def update_show_pace(tmdb_id: int, body: ShowPaceRequest, db: Session = Depends(get_db)):
+    """Set the binge-pace preference for a tracked show."""
+    if body.watch_pace not in _VALID_PACES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"watch_pace must be one of: {', '.join(sorted(_VALID_PACES))}",
+        )
+    show = db.execute(
+        select(models.Show).where(models.Show.tmdb_id == tmdb_id)
+    ).scalar_one_or_none()
+    if not show:
+        raise HTTPException(status_code=404, detail="Show not tracked")
+    show.watch_pace = body.watch_pace
+    db.commit()
+    return {"tmdb_id": tmdb_id, "watch_pace": show.watch_pace}
 
 
 @router.get("", response_model=list[ShowResponse])

@@ -76,6 +76,13 @@ def _run_migrations() -> None:
         """))
         conn.commit()
 
+        # Migration 6: add watch_pace column (binge | fast | weekly)
+        try:
+            conn.execute(text("SELECT watch_pace FROM shows LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE shows ADD COLUMN watch_pace VARCHAR DEFAULT 'binge'"))
+            conn.commit()
+
 
 _run_migrations()
 

@@ -390,6 +390,19 @@
       border-radius: 10px; padding: 0.1rem 0.45rem;
       font-size: 0.65rem; font-weight: 700;
     }
+    .sched-available-badge { flex-shrink: 0; background: var(--orange); color: #fff; border-radius: 10px; padding: 0.1rem 0.45rem; font-size: 0.65rem; font-weight: 600; }
+    .sched-pace-badge { flex-shrink: 0; background: var(--cyan); color: #fff; border-radius: 10px; padding: 0.1rem 0.45rem; font-size: 0.65rem; font-weight: 600; }
+    .sched-status-label { font-size: 0.65rem; color: var(--tx-dim); flex-shrink: 0; }
+    .schedule-cap-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--tx-dim); }
+    .schedule-cap-bar input[type="number"] { width: 52px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--tx); padding: 0.25rem 0.4rem; font-size: 0.82rem; text-align: center; outline: none; }
+    .schedule-cap-hit { padding: 0.625rem 0.75rem; background: var(--surface); border-radius: 10px; font-size: 0.82rem; color: var(--tx-dim); text-align: center; margin-top: 0.5rem; }
+
+    /* ── Pace selector (show detail page) ───────────────────────────────── */
+    .pace-selector { display: flex; gap: 0.375rem; flex-wrap: wrap; margin: 0 0 0.75rem; align-items: center; }
+    .pace-label { font-size: 0.72rem; color: var(--tx-dim); margin-right: 0.25rem; }
+    .pace-btn { padding: 0.25rem 0.7rem; border-radius: 20px; border: 1.5px solid var(--border); color: var(--tx-dim); font-size: 0.75rem; transition: all 0.12s; }
+    .pace-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .pace-btn.active { background: var(--cyan); border-color: var(--cyan); color: #fff; font-weight: 500; }
 
     /* ── Episode list ───────────────────────────────────────────────────── */
     .episode-list { display: flex; flex-direction: column; }
@@ -988,94 +1001,88 @@
 
     // ── Page: Schedule ───────────────────────────────────────────────────────
     async function pageSchedule(app) {
-      let data;
+      var data;
       try { data = await get('/schedule/today'); }
       catch(e) {
-        app.innerHTML = `<div class="page"><div class="empty-state"><h3>Error loading schedule</h3><p>${esc(e.message)}</p></div></div>`;
+        app.innerHTML = '<div class="page"><div class="empty-state"><h3>Error loading schedule</h3><p>' + esc(e.message) + '</p></div></div>';
         return;
       }
 
-      const SECTION_LABEL = {
-        airing_now:    'Airing Now',
-        keep_watching: 'Keep Watching',
-        up_next:       'Up Next',
-        pick_up_again: 'Pick Up Again',
-      };
+      var dailyCap = parseInt(localStorage.getItem('whist_daily_cap') || '5', 10) || 5;
 
       function schedCardHTML(item) {
-        const { show, next_episode: ep, new_count } = item;
-        const code = epCode(ep.season_number, ep.episode_number);
-        const nav = `/show/${show.tmdb_id}/season/${ep.season_number}/episode/${ep.episode_number}`;
-        const badge = new_count > 1 ? `<span class="sched-new-badge">${new_count} new</span>` : '';
-        return `
-          <div class="schedule-card" data-nav="${nav}" data-show-id="${show.tmdb_id}">
-            ${show.poster_path
-              ? `<img class="sched-poster" src="${img(show.poster_path,'w185')}" alt="${esc(show.title)}" loading="lazy">`
-              : `<div class="sched-poster"></div>`}
-            <div class="sched-info">
-              <div class="sched-title-row">
-                <span class="sched-title">${esc(show.title)}</span>
-                ${badge}
-              </div>
-              <div class="sched-ep">${esc(code)}${ep.title ? ' · ' + esc(ep.title) : ''}</div>
-              ${ep.air_date ? `<div class="sched-date">${esc(ep.air_date)}</div>` : ''}
-              <div class="sched-providers"></div>
-            </div>
-          </div>`;
+        var show = item.show, ep = item.next_episode;
+        var available = item.available_count || 0, suggested = item.suggested_count || 0;
+        var code = epCode(ep.season_number, ep.episode_number);
+        var nav = '/show/' + show.tmdb_id + '/season/' + ep.season_number + '/episode/' + ep.episode_number;
+        var availBadge = available > 1 ? '<span class="sched-available-badge">' + available + ' available</span>' : '';
+        var paceBadge  = suggested > 0  ? '<span class="sched-pace-badge">1\u20132 eps</span>' : '';
+        var statusLabel = '<span class="sched-status-label">' + esc(show.user_status === 'airing' ? 'Airing' : 'Watching') + '</span>';
+        var poster = show.poster_path
+          ? '<img class="sched-poster" src="' + img(show.poster_path, 'w185') + '" alt="' + esc(show.title) + '" loading="lazy">'
+          : '<div class="sched-poster"></div>';
+        var airDate = ep.air_date ? '<div class="sched-date">' + esc(ep.air_date) + '</div>' : '';
+        return '<div class="schedule-card" data-nav="' + nav + '" data-show-id="' + show.tmdb_id + '">'
+          + poster
+          + '<div class="sched-info">'
+            + '<div class="sched-title-row"><span class="sched-title">' + esc(show.title) + '</span>' + availBadge + paceBadge + statusLabel + '</div>'
+            + '<div class="sched-ep">' + esc(code) + (ep.title ? ' \xb7 ' + esc(ep.title) : '') + '</div>'
+            + airDate
+            + '<div class="sched-providers"></div>'
+          + '</div>'
+          + '</div>';
       }
 
-      const order = ['airing_now', 'keep_watching', 'up_next', 'pick_up_again'];
-      const sections = order.filter(k => data[k].length);
+      var items = data.items || [];
+      var cardsHTML = '';
+      var remaining = dailyCap;
 
-      let body;
-      if (!sections.length) {
-        body = `
-          <div class="empty-state">
-            <h3>Nothing queued up</h3>
-            <p>Mark episodes watched or set shows to Airing/Binging to see suggestions here.</p>
-            <button class="btn btn-accent" style="margin-top:1rem" data-nav="/library">Go to Library</button>
-          </div>`;
-      } else {
-        body = sections.map(k => `
-          <div class="schedule-section">
-            <div class="section-header">
-              <h2 style="color:var(--orange)">${SECTION_LABEL[k]}</h2>
-              <span class="section-count">${data[k].length}</span>
-            </div>
-            <div class="schedule-list">${data[k].map(schedCardHTML).join('')}</div>
-          </div>`).join('');
+      for (var i = 0; i < items.length; i++) {
+        if (remaining <= 0) {
+          cardsHTML += '<div class="schedule-cap-hit">You\'ve hit today\'s cap \u2014 enjoy what you have!</div>';
+          break;
+        }
+        cardsHTML += schedCardHTML(items[i]);
+        var cost = Math.max(1, items[i].available_count || 0);
+        remaining -= cost;
       }
 
-      app.innerHTML = `
-        <div class="page">
-          <div class="page-header">
-            <h1>Schedule</h1>
-            <p>What to watch today</p>
-          </div>
-          ${body}
-        </div>`;
+      var capBar = '<div class="schedule-cap-bar">'
+        + '<label>Daily episode cap: <input type="number" id="daily-cap-input" min="1" max="50" value="' + dailyCap + '"></label>'
+        + '</div>';
+
+      var body = items.length
+        ? '<div class="schedule-list">' + cardsHTML + '</div>'
+        : '<div class="empty-state"><h3>Nothing queued up</h3><p>Set shows to Airing or Watching to see suggestions here.</p>'
+          + '<button class="btn btn-accent" style="margin-top:1rem" data-nav="/library">Go to Library</button></div>';
+
+      app.innerHTML = '<div class="page">'
+        + '<div class="page-header"><h1>Schedule</h1><p>What to watch today</p></div>'
+        + capBar
+        + body
+        + '</div>';
       bindNav(app);
 
+      app.querySelector('#daily-cap-input').addEventListener('change', function() {
+        var v = parseInt(this.value, 10);
+        if (v > 0) { localStorage.setItem('whist_daily_cap', String(v)); pageSchedule(app); }
+      });
+
       // Load preferred streaming providers for each unique show (non-blocking).
-      // On schedule cards only show services the user has saved — keeps cards clean.
-      const saved = JSON.parse(localStorage.getItem('whist_services') || '[]');
-      const savedSet = new Set(saved);
-      const allItems = [
-        ...data.airing_now, ...data.keep_watching, ...data.up_next, ...data.pick_up_again,
-      ];
-      const uniqueShowIds = [...new Set(allItems.map(item => item.show.tmdb_id))];
-      uniqueShowIds.forEach(showId => {
-        get(`/shows/${showId}/watch-providers`).then(prov => {
-          // Filter to preferred services only (or all if no preferences set)
-          const streaming = savedSet.size > 0
-            ? prov.streaming.filter(p => isPreferred(p.provider_name, savedSet))
+      var saved = JSON.parse(localStorage.getItem('whist_services') || '[]');
+      var savedSet = new Set(saved);
+      var uniqueShowIds = Array.from(new Set(items.map(function(item) { return item.show.tmdb_id; })));
+      uniqueShowIds.forEach(function(showId) {
+        get('/shows/' + showId + '/watch-providers').then(function(prov) {
+          var streaming = savedSet.size > 0
+            ? prov.streaming.filter(function(p) { return isPreferred(p.provider_name, savedSet); })
             : prov.streaming;
           if (!streaming.length) return;
-          const html = streaming.map(p => providerLogoHTML(p, savedSet)).join('');
-          app.querySelectorAll(`[data-show-id="${showId}"] .sched-providers`).forEach(el => {
+          var html = streaming.map(function(p) { return providerLogoHTML(p, savedSet); }).join('');
+          app.querySelectorAll('[data-show-id="' + showId + '"] .sched-providers').forEach(function(el) {
             el.innerHTML = html;
           });
-        }).catch(() => {});
+        }).catch(function() {});
       });
     }
 
@@ -1293,12 +1300,23 @@
           <button class="btn btn-accent" id="add-btn" style="margin-top:0.5rem">Add to Library</button>
         </div>` : '';
 
+      const currentPace = detail.watch_pace || 'binge';
+      const PACE_LABEL = { binge: 'Binge', fast: 'Fast', weekly: 'Weekly' };
+      const showPaceSelector = detail.tracked && (detail.user_status === 'watching' || detail.user_status === 'airing');
+      const paceHTML = showPaceSelector
+        ? '<div class="pace-selector"><span class="pace-label">Pace</span>'
+          + Object.entries(PACE_LABEL).map(function(e) {
+              return '<button class="pace-btn ' + (currentPace === e[0] ? 'active' : '') + '" data-pace="' + e[0] + '">' + e[1] + '</button>';
+            }).join('')
+          + '</div>'
+        : '';
+
       const statusHTML = detail.tracked ? `
         <div class="status-selector">
           ${Object.entries(STATUS_LABEL).map(([k,v]) =>
             `<button class="status-btn ${detail.user_status===k?'active':''}" data-status="${k}">${v}</button>`
           ).join('')}
-        </div>` : '';
+        </div>` + paceHTML : '';
 
       const progressHTML = progress ? `
         <div class="progress-row">${progress.watched} / ${progress.total} episodes (${progress.percent}%)</div>
@@ -1377,6 +1395,18 @@
             await patch(`/shows/${tmdbId}/status`, { user_status: btn.dataset.status });
             app.querySelectorAll('.status-btn').forEach(b =>
               b.classList.toggle('active', b.dataset.status === btn.dataset.status));
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+      });
+
+      // Pace buttons
+      app.querySelectorAll('.pace-btn').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          try {
+            await patch('/shows/' + tmdbId + '/pace', { watch_pace: btn.dataset.pace });
+            app.querySelectorAll('.pace-btn').forEach(function(b) {
+              b.classList.toggle('active', b.dataset.pace === btn.dataset.pace);
+            });
           } catch(e) { alert('Error: ' + e.message); }
         });
       });
