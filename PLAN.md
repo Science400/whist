@@ -165,7 +165,7 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 ### Pending page-specific redesigns
 - [ ] Schedule page layout
 - [ ] Library page layout
-- [ ] Show page layout
+- [x] Show page layout — backdrop gradient fade, blue accent title, TMDB link, round-rect status/pace buttons, overview 4-line clamp with expand
 - [x] Season page layout — prev/next season nav, air date inline with ep code, single watched-date column, accent left border on watched rows, accent "Mark Season Watched" button
 - [x] Episode page layout — hero (still + info side-by-side, 240px thumb), prev/next nav (cross-season), TMDB link, watch history behind toggle
 - [ ] Person page layout
