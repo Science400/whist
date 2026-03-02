@@ -441,6 +441,7 @@
       transition: background 0.08s;
     }
     .episode-row:hover { background: var(--surface); border-radius: 6px; }
+    .episode-row.ep-row-watched { border-left: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); padding-left: calc(0.5rem - 2px); }
     .ep-check {
       width: 20px; height: 20px; flex-shrink: 0;
       border-radius: 6px;
@@ -458,10 +459,11 @@
     .ep-watched-at { font-size: 0.72rem; color: var(--accent); flex-shrink: 0; }
     .ep-watch-count { font-size: 0.72rem; color: var(--tx-dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
     .ep-edit-btn {
-      flex-shrink: 0; width: 28px; height: 28px;
+      flex-shrink: 0; height: 26px; padding: 0 0.4rem;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 6px; color: var(--tx-dim); font-size: 0.75rem;
+      border-radius: 6px; color: var(--tx-dim); font-size: 0.72rem;
       opacity: 0; transition: opacity 0.1s, background 0.1s;
+      white-space: nowrap;
     }
     .episode-row:hover .ep-edit-btn { opacity: 1; }
     .ep-edit-btn:hover { background: var(--surface-2); color: var(--tx); }
@@ -1500,9 +1502,13 @@
 
     // ── Page: Season ─────────────────────────────────────────────────────────
     async function pageSeason(app, tmdbId, seasonNum) {
-      let data;
-      try { data = await get(`/shows/${tmdbId}/season/${seasonNum}`); }
-      catch(e) {
+      let data, detailData;
+      try {
+        [data, detailData] = await Promise.all([
+          get(`/shows/${tmdbId}/season/${seasonNum}`),
+          get(`/shows/${tmdbId}/detail`),
+        ]);
+      } catch(e) {
         app.innerHTML = `<div class="page"><div class="empty-state"><h3>Error</h3><p>${esc(e.message)}</p></div></div>`;
         return;
       }
@@ -1516,17 +1522,19 @@
 
       function epRowHTML(ep) {
         const st = epState[ep.episode_number];
+        const codeLine = ep.air_date
+          ? `${epCode(seasonNum, ep.episode_number)} · ${ep.air_date}`
+          : epCode(seasonNum, ep.episode_number);
         return `
-          <div class="episode-row" data-ep="${ep.episode_number}">
+          <div class="episode-row${st.watched?' ep-row-watched':''}" data-ep="${ep.episode_number}">
             <div class="ep-check ${st.watched?'watched':''}" data-check="${ep.episode_number}">${st.watched?'✓':''}</div>
             <div class="ep-info">
-              <div class="ep-code">${epCode(seasonNum, ep.episode_number)}</div>
+              <div class="ep-code">${codeLine}</div>
               <div class="ep-title">${esc(ep.title||'')}</div>
             </div>
-            ${ep.air_date?`<div class="ep-air-date">${ep.air_date}</div>`:''}
             ${st.watched&&st.watched_at?`<div class="ep-watched-at">${st.watched_at}</div>`:''}
             ${st.watch_count>1?`<div class="ep-watch-count">\xd7${st.watch_count}</div>`:''}
-            <button class="ep-edit-btn" data-edit="${ep.episode_number}" title="${st.watched?'Watch history':'Log with date'}">✏</button>
+            <button class="ep-edit-btn" data-edit="${ep.episode_number}" title="${st.watched?'Watch history':'Log with date'}">${st.watched?'···':'+ date'}</button>
           </div>`;
       }
 
@@ -1534,14 +1542,27 @@
         return { number: e.episode_number, watched: e.watched };
       }));
 
+      // Prev/next season
+      const allSeasons = (detailData.seasons || []).sort((a, b) => a.season_number - b.season_number);
+      const prevSeason = [...allSeasons].reverse().find(s => s.season_number < seasonNum);
+      const nextSeason = allSeasons.find(s => s.season_number > seasonNum);
+
       app.innerHTML = `
         <div class="page">
           <div class="breadcrumb">
             <a data-nav="/library">Library</a>
             <span class="breadcrumb-sep">›</span>
-            <a data-nav="/show/${tmdbId}" id="show-crumb">Show</a>
+            <a data-nav="/show/${tmdbId}">${esc(detailData.title)}</a>
             <span class="breadcrumb-sep">›</span>
             <span>${esc(data.name||`Season ${seasonNum}`)}</span>
+          </div>
+          <div class="ep-nav" style="margin-bottom:1.25rem">
+            ${prevSeason
+              ? `<a class="ep-nav-btn" data-nav="/show/${tmdbId}/season/${prevSeason.season_number}">← ${esc(prevSeason.name||'Season '+prevSeason.season_number)}</a>`
+              : `<span class="ep-nav-btn ep-nav-disabled">← First season</span>`}
+            ${nextSeason
+              ? `<a class="ep-nav-btn ep-nav-next" data-nav="/show/${tmdbId}/season/${nextSeason.season_number}">${esc(nextSeason.name||'Season '+nextSeason.season_number)} →</a>`
+              : `<span class="ep-nav-btn ep-nav-next ep-nav-disabled">Last season →</span>`}
           </div>
           <div style="display:flex;gap:1.25rem;align-items:flex-start;margin-bottom:1.5rem">
             ${data.poster_path
@@ -1556,7 +1577,7 @@
             </div>
           </div>
           <div class="bulk-actions">
-            <button class="btn btn-outline btn-sm" id="mark-all">Mark Season Watched</button>
+            <button class="btn btn-accent btn-sm" id="mark-all">Mark Season Watched</button>
           </div>
           <div class="episode-list" id="ep-list">
             ${data.episodes.map(epRowHTML).join('')}
@@ -1564,12 +1585,6 @@
         </div>`;
 
       bindNav(app);
-
-      // Update breadcrumb show name
-      get(`/shows/${tmdbId}/detail`).then(d => {
-        const el = app.querySelector('#show-crumb');
-        if (el) el.textContent = d.title;
-      }).catch(()=>{});
 
       // Load watch providers (non-blocking)
       loadProviders(app, tmdbId, '#season-providers', false);
@@ -1587,6 +1602,13 @@
         const check = row.querySelector('[data-check]');
         if (st.watched) { check.classList.add('watched'); check.textContent = '✓'; }
         else { check.classList.remove('watched'); check.textContent = ''; }
+        row.classList.toggle('ep-row-watched', !!st.watched);
+        // Update edit button label
+        const editBtn = row.querySelector('.ep-edit-btn');
+        if (editBtn) {
+          editBtn.textContent = st.watched ? '···' : '+ date';
+          editBtn.title = st.watched ? 'Watch history' : 'Log with date';
+        }
         // Update watched_at and watch count badge
         const old = row.querySelector('.ep-watched-at');
         if (old) old.remove();
@@ -1595,12 +1617,12 @@
         if (st.watched && st.watched_at) {
           const d = document.createElement('div');
           d.className = 'ep-watched-at'; d.textContent = st.watched_at;
-          row.querySelector('.ep-edit-btn').before(d);
+          editBtn.before(d);
         }
         if (st.watch_count > 1) {
           const b = document.createElement('div');
           b.className = 'ep-watch-count'; b.textContent = '\xd7' + st.watch_count;
-          row.querySelector('.ep-edit-btn').before(b);
+          editBtn.before(b);
         }
         // Update header bar segment
         const seg = app.querySelector('#prog-bar .seg[data-seg="' + epNum + '"]');
