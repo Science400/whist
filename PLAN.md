@@ -167,15 +167,15 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 - [ ] Library page layout
 - [ ] Show page layout
 - [ ] Season page layout
-- [ ] Episode page layout
+- [x] Episode page layout — hero (still + info side-by-side, 240px thumb), prev/next nav (cross-season), TMDB link, watch history behind toggle
 - [ ] Person page layout
 
 ### Other items
 - [ ] Mobile-responsive layout polish
 - [ ] Possibly installable as PWA (revisit when mobile layout solid)
-- [ ] Replace horizontal-scroll cast grids with wrapping grid option (actor/character names get cut off)
+- [x] Replace horizontal-scroll cast grids with wrapping grid (global — show, episode, person pages); 2-line name clamp
 - [ ] Show years in the appropriate places
-- [ ] Watch History hidden until requested (not front and center on episode page)
+- [x] Watch History hidden behind toggle button with prefetched count
 
 ---
 
