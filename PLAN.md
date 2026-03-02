@@ -168,7 +168,7 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 - [x] Show page layout — backdrop gradient fade, blue accent title, TMDB link, round-rect status/pace buttons, overview 4-line clamp with expand
 - [x] Season page layout — prev/next season nav, air date inline with ep code, single watched-date column, accent left border on watched rows, accent "Mark Season Watched" button
 - [x] Episode page layout — hero (still + info side-by-side, 240px thumb), prev/next nav (cross-season), TMDB link, watch history behind toggle
-- [ ] Person page layout
+- [x] Person page layout — accent title, split seen-in (main/guest), guest episode links, year on all credits, accent section headers
 
 ### Other items
 - [ ] Mobile-responsive layout polish
@@ -204,8 +204,8 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 ---
 
 ## Other Features (To Be Categorized)
-- [ ] On a person page, divide their things I've seen them in into main character vs guest
-- [ ] If they're a guest, link to the specific episode
+- [x] On a person page, divide their things I've seen them in into main character vs guest
+- [x] If they're a guest, link to the specific episode
 - [ ] Fix Add to Library 500 Internal Server Error
 - [ ] Import old watchlists from Trakt
 - [ ] I can't mark a whole show as complete and the mark season watched can't handle a second watch

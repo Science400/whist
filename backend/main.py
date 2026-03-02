@@ -83,6 +83,30 @@ def _run_migrations() -> None:
             conn.execute(text("ALTER TABLE shows ADD COLUMN watch_pace VARCHAR DEFAULT 'binge'"))
             conn.commit()
 
+        # Migration 7: add first_air_date to person_credits
+        try:
+            conn.execute(text("SELECT first_air_date FROM person_credits LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE person_credits ADD COLUMN first_air_date TEXT"))
+            conn.commit()
+
+        # Migration 8: create episode_credits table
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS episode_credits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                person_tmdb_id INTEGER NOT NULL,
+                show_tmdb_id INTEGER NOT NULL,
+                season_number INTEGER NOT NULL,
+                episode_number INTEGER NOT NULL,
+                character TEXT,
+                UNIQUE(person_tmdb_id, show_tmdb_id, season_number, episode_number)
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_episode_credits_person ON episode_credits (person_tmdb_id)"
+        ))
+        conn.commit()
+
 
 _run_migrations()
 

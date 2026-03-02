@@ -572,7 +572,7 @@
       display: flex; align-items: center; justify-content: center;
       color: var(--tx-dim); font-size: 2rem;
     }
-    .person-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .person-name { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
     .seen-in-section {
       background: color-mix(in srgb, var(--purple) 8%, var(--surface));
       border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--border));
@@ -603,6 +603,17 @@
     }
     .seen-in-title { font-size: 0.7rem; color: var(--tx); margin-top: 0.35rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .seen-in-char { font-size: 0.65rem; color: var(--tx-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .seen-in-year { font-size: 0.62rem; color: var(--tx-dim); font-family: 'Geist Mono', monospace; }
+    .guest-row {
+      display: flex; align-items: center; gap: 0.875rem;
+      padding: 0.5rem 0.25rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+      cursor: pointer; transition: background 0.08s; border-radius: 6px;
+    }
+    .guest-row:hover { background: var(--surface); }
+    .guest-info { flex: 1; min-width: 0; }
+    .guest-show-title { font-size: 0.875rem; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .guest-detail { font-size: 0.72rem; color: var(--tx-dim); }
     .credits-list { display: flex; flex-direction: column; gap: 0.375rem; }
     .credit-row {
       display: flex; align-items: center; gap: 0.875rem;
@@ -1909,25 +1920,50 @@
         return;
       }
 
-      const { person, seen_in } = data;
+      const { person, main_cast, guest } = data;
+      const allSeen = [...main_cast, ...guest];
 
-      const seenHTML = seen_in.length ? `
+      const mainHTML = main_cast.length ? `
         <div class="seen-in-section">
-          <div class="seen-in-label">Seen in ${seen_in.length} title${seen_in.length!==1?'s':''} you've watched</div>
+          <div class="seen-in-label">Main cast in ${main_cast.length} title${main_cast.length!==1?'s':''} you've watched</div>
           <div class="seen-in-grid">
-            ${seen_in.map(c => `
+            ${main_cast.map(c => `
               <div class="seen-in-card" data-nav="/show/${c.tmdb_id}">
                 ${c.poster_path
                   ? `<img src="${img(c.poster_path,'w185')}" alt="${esc(c.title)}" loading="lazy">`
                   : `<div class="seen-in-card-placeholder">${esc(c.title)}</div>`}
                 <div class="seen-in-title">${esc(c.title)}</div>
                 <div class="seen-in-char">${esc(c.character||'')}</div>
+                ${c.first_air_date ? `<div class="seen-in-year">${c.first_air_date.slice(0,4)}</div>` : ''}
               </div>`).join('')}
           </div>
-        </div>` : `
+        </div>` : '';
+
+      const guestHTML = guest.length ? `
+        <div class="section" style="margin-bottom:2rem">
+          <div class="section-header"><h2 style="color:var(--accent)">Guest Appearances</h2></div>
+          <div>
+            ${guest.map(c => {
+              const nav = (c.season_number && c.episode_number)
+                ? `/show/${c.tmdb_id}/season/${c.season_number}/episode/${c.episode_number}`
+                : `/show/${c.tmdb_id}`;
+              const epLabel = (c.season_number && c.episode_number)
+                ? ' · ' + epCode(c.season_number, c.episode_number)
+                : '';
+              return `<div class="guest-row" data-nav="${nav}">
+                <div class="guest-info">
+                  <div class="guest-show-title">${esc(c.title)}</div>
+                  <div class="guest-detail">${esc(c.character||'')}${epLabel}${c.first_air_date?' · '+c.first_air_date.slice(0,4):''}</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : '';
+
+      const noSeenHTML = (!main_cast.length && !guest.length) ? `
         <div style="background:var(--surface);border-radius:10px;padding:1rem;margin-bottom:2rem;color:var(--tx-dim);font-size:0.875rem">
           No overlap with your watch history yet.
-        </div>`;
+        </div>` : '';
 
       app.innerHTML = `
         <div class="page">
@@ -1939,9 +1975,9 @@
               <h1 class="person-name">${esc(person.name)}</h1>
             </div>
           </div>
-          ${seenHTML}
+          ${mainHTML}${guestHTML}${noSeenHTML}
           <div class="section-header">
-            <h2>All Credits</h2>
+            <h2 style="color:var(--accent)">All Credits</h2>
             <span class="section-count" id="credits-count">…</span>
           </div>
           <div id="all-credits"><div class="loading">Loading…</div></div>
@@ -1950,7 +1986,7 @@
       bindNav(app);
 
       // Load all credits
-      const seenIds = new Set(seen_in.map(c => c.tmdb_id));
+      const seenIds = new Set(allSeen.map(c => c.tmdb_id));
       try {
         const credits = await get(`/people/${tmdbId}/all-credits`);
         app.querySelector('#credits-count').textContent = credits.length;
@@ -1966,7 +2002,7 @@
                     : `<div class="credit-poster-ph"></div>`}
                   <div class="credit-info">
                     <div class="credit-title">${esc(c.title)}</div>
-                    <div class="credit-char">${esc(c.character||'')}${c.type?' · '+c.type:''}</div>
+                    <div class="credit-char">${esc(c.character||'')}${c.type?' · '+c.type:''}${c.first_air_date?' · '+c.first_air_date.slice(0,4):''}</div>
                   </div>
                   ${seenIds.has(c.show_tmdb_id)?'<div class="credit-dot" title="In your watch history"></div>':''}
                 </div>`).join('')}

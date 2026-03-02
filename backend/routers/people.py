@@ -1,11 +1,11 @@
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
+from backend.database import SessionLocal, get_db
 from backend import models, tmdb
 
 router = APIRouter(tags=["people"])
@@ -69,6 +69,8 @@ async def _ensure_person_credits_cached(person: models.Person, db: Session) -> N
 
         title = credit.get("name") or credit.get("title") or "Unknown"
 
+        first_air = credit.get("first_air_date") or credit.get("release_date") or None
+
         exists = db.execute(
             select(models.PersonCredit).where(
                 models.PersonCredit.person_tmdb_id == person.tmdb_id,
@@ -82,6 +84,7 @@ async def _ensure_person_credits_cached(person: models.Person, db: Session) -> N
                 title=title,
                 character=credit.get("character", ""),
                 type=media_type,
+                first_air_date=first_air,
             ))
 
     person.credits_cached_at = datetime.now(timezone.utc).isoformat()
@@ -118,6 +121,61 @@ def _seen_in_counts(
         q = q.where(models.PersonCredit.show_tmdb_id != exclude_show_id)
     rows = db.execute(q.group_by(models.PersonCredit.person_tmdb_id)).all()
     return {row.person_tmdb_id: row.cnt for row in rows}
+
+
+async def _backfill_episode_credits(person_tmdb_id: int, show_tmdb_ids: list[int]) -> None:
+    """
+    Background task: for each show in show_tmdb_ids, fetch TMDB episode credits
+    for every watched episode and populate EpisodeCredit rows for this person.
+    Runs after the seen-in response is returned so the page load isn't blocked.
+    """
+    db = SessionLocal()
+    try:
+        for show_tmdb_id in show_tmdb_ids:
+            watched_eps = db.execute(
+                select(models.Episode.season_number, models.Episode.episode_number)
+                .where(
+                    models.Episode.tmdb_show_id == show_tmdb_id,
+                    models.Episode.watched == True,  # noqa: E712
+                )
+                .order_by(models.Episode.season_number, models.Episode.episode_number)
+            ).all()
+
+            if not watched_eps:
+                continue
+
+            results = await asyncio.gather(
+                *[tmdb.get_episode_credits(show_tmdb_id, row.season_number, row.episode_number)
+                  for row in watched_eps],
+                return_exceptions=True,
+            )
+
+            for row, result in zip(watched_eps, results):
+                if isinstance(result, Exception):
+                    continue
+                all_members = result.get("cast", []) + result.get("guest_stars", [])
+                for member in all_members:
+                    if member.get("id") != person_tmdb_id:
+                        continue
+                    exists = db.execute(
+                        select(models.EpisodeCredit).where(
+                            models.EpisodeCredit.person_tmdb_id == person_tmdb_id,
+                            models.EpisodeCredit.show_tmdb_id == show_tmdb_id,
+                            models.EpisodeCredit.season_number == row.season_number,
+                            models.EpisodeCredit.episode_number == row.episode_number,
+                        )
+                    ).scalar_one_or_none()
+                    if not exists:
+                        db.add(models.EpisodeCredit(
+                            person_tmdb_id=person_tmdb_id,
+                            show_tmdb_id=show_tmdb_id,
+                            season_number=row.season_number,
+                            episode_number=row.episode_number,
+                            character=member.get("character", ""),
+                        ))
+            db.commit()
+    finally:
+        db.close()
 
 
 @router.get("/shows/{tmdb_show_id}/cast")
@@ -167,7 +225,7 @@ def get_all_credits(tmdb_person_id: int, db: Session = Depends(get_db)):
         select(models.PersonCredit, models.Show.poster_path)
         .outerjoin(models.Show, models.Show.tmdb_id == models.PersonCredit.show_tmdb_id)
         .where(models.PersonCredit.person_tmdb_id == tmdb_person_id)
-        .order_by(models.PersonCredit.title)
+        .order_by(models.PersonCredit.first_air_date.desc().nulls_last())
     ).all()
 
     return [
@@ -176,6 +234,7 @@ def get_all_credits(tmdb_person_id: int, db: Session = Depends(get_db)):
             "title": pc.title,
             "character": pc.character,
             "type": pc.type,
+            "first_air_date": pc.first_air_date,
             "poster_path": poster_path,
         }
         for pc, poster_path in rows
@@ -183,7 +242,7 @@ def get_all_credits(tmdb_person_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/people/{tmdb_person_id}/seen-in")
-async def seen_in(tmdb_person_id: int, db: Session = Depends(get_db)):
+async def seen_in(tmdb_person_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Core WHIST query: return all credits for a person that overlap with
     the user's watch history (shows that have at least one watched episode).
@@ -213,8 +272,54 @@ async def seen_in(tmdb_person_id: int, db: Session = Depends(get_db)):
             models.PersonCredit.person_tmdb_id == tmdb_person_id,
             models.PersonCredit.show_tmdb_id.in_(watched_show_ids),
         )
-        .order_by(models.PersonCredit.title)
+        .order_by(models.PersonCredit.first_air_date.desc().nulls_last())
     ).all()
+
+    # Determine main cast vs guest: person in ShowCast = main cast
+    main_show_ids = set(db.execute(
+        select(models.ShowCast.show_tmdb_id)
+        .where(models.ShowCast.person_tmdb_id == tmdb_person_id)
+    ).scalars().all())
+
+    main_cast, guest = [], []
+    for pc, poster_path in rows:
+        entry = {
+            "tmdb_id": pc.show_tmdb_id,
+            "title": pc.title,
+            "character": pc.character,
+            "first_air_date": pc.first_air_date,
+            "poster_path": poster_path,
+        }
+        if pc.show_tmdb_id in main_show_ids:
+            main_cast.append(entry)
+        else:
+            # Look up first watched episode for episode links
+            ep = db.execute(
+                select(models.EpisodeCredit)
+                .join(models.Episode, and_(
+                    models.Episode.tmdb_show_id == models.EpisodeCredit.show_tmdb_id,
+                    models.Episode.season_number == models.EpisodeCredit.season_number,
+                    models.Episode.episode_number == models.EpisodeCredit.episode_number,
+                    models.Episode.watched == True,  # noqa: E712
+                ))
+                .where(
+                    models.EpisodeCredit.person_tmdb_id == tmdb_person_id,
+                    models.EpisodeCredit.show_tmdb_id == pc.show_tmdb_id,
+                )
+                .order_by(models.EpisodeCredit.season_number, models.EpisodeCredit.episode_number)
+                .limit(1)
+            ).scalar_one_or_none()
+            entry["season_number"] = ep.season_number if ep else None
+            entry["episode_number"] = ep.episode_number if ep else None
+            guest.append(entry)
+
+    # Trigger background backfill for guest shows that don't have episode links yet
+    missing_ep_data = [
+        entry["tmdb_id"] for entry in guest
+        if entry["season_number"] is None
+    ]
+    if missing_ep_data:
+        background_tasks.add_task(_backfill_episode_credits, tmdb_person_id, missing_ep_data)
 
     return {
         "person": {
@@ -222,16 +327,8 @@ async def seen_in(tmdb_person_id: int, db: Session = Depends(get_db)):
             "name": person.name,
             "profile_path": person.profile_path,
         },
-        "seen_in": [
-            {
-                "tmdb_id": pc.show_tmdb_id,
-                "title": pc.title,
-                "character": pc.character,
-                "type": pc.type,
-                "poster_path": poster_path,
-            }
-            for pc, poster_path in rows
-        ],
+        "main_cast": main_cast,
+        "guest": guest,
     }
 
 
@@ -321,6 +418,29 @@ async def get_episode_cast(
                     ))
             person.credits_cached_at = datetime.now(timezone.utc).isoformat()
         db.commit()
+
+    # Populate EpisodeCredit rows for all cast members (main cast + guest stars)
+    for member in all_members:
+        person_id = member.get("id")
+        if not person_id:
+            continue
+        exists = db.execute(
+            select(models.EpisodeCredit).where(
+                models.EpisodeCredit.person_tmdb_id == person_id,
+                models.EpisodeCredit.show_tmdb_id == tmdb_show_id,
+                models.EpisodeCredit.season_number == season_number,
+                models.EpisodeCredit.episode_number == episode_number,
+            )
+        ).scalar_one_or_none()
+        if not exists:
+            db.add(models.EpisodeCredit(
+                person_tmdb_id=person_id,
+                show_tmdb_id=tmdb_show_id,
+                season_number=season_number,
+                episode_number=episode_number,
+                character=member.get("character", ""),
+            ))
+    db.commit()
 
     # Seen-in counts, excluding the current show so "1 = only this show" → hidden
     all_ids = [m.get("id") for m in all_members if m.get("id")]

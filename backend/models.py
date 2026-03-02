@@ -72,6 +72,7 @@ class PersonCredit(Base):
     title = Column(String, nullable=False)
     character = Column(String)
     type = Column(String, nullable=False)         # tv | movie
+    first_air_date = Column(String)               # YYYY-MM-DD or None
 
     person = relationship("Person", back_populates="credits")
 
@@ -88,6 +89,21 @@ class WatchHistory(Base):
     season_number  = Column(Integer, nullable=False)
     episode_number = Column(Integer, nullable=False)
     watched_at     = Column(String)  # YYYY-MM-DD or None
+
+
+class EpisodeCredit(Base):
+    __tablename__ = "episode_credits"
+    __table_args__ = (
+        Index("ix_episode_credits_person", "person_tmdb_id"),
+        UniqueConstraint("person_tmdb_id", "show_tmdb_id", "season_number", "episode_number"),
+    )
+
+    id             = Column(Integer, primary_key=True, index=True)
+    person_tmdb_id = Column(Integer, nullable=False)
+    show_tmdb_id   = Column(Integer, nullable=False)
+    season_number  = Column(Integer, nullable=False)
+    episode_number = Column(Integer, nullable=False)
+    character      = Column(String)
 
 
 class ShowCast(Base):
