@@ -143,13 +143,39 @@ Three modes settable per show:
 
 ## Phase 8 — Mobile & UI Refresh
 
-- [ ] Mobile-responsive layout (works well on phone)
-- [ ] Possibly installable as PWA (home screen shortcut; not ideal since it doesn't
-      go to app drawer on Android — revisit when mobile layout is solid)
-- [ ] Replace horizontal-scroll cast grids with wrapping grid option. This is because the actor and character names get cut off easily.
-- [ ] Visual redesign — less utilitarian
+### Design direction: Obsidian / Raycast aesthetic
+Dark, precise, slightly techy. Per-page accent colors stay (orange=schedule, yellow=library, etc.).
+Screenshot automation: `uv run python scripts/screenshot.py` (requires app running + playwright installed).
+
+### Overall look & feel ✓ (implemented)
+- [x] Geist + Geist Mono fonts (Google Fonts) — Geist is Raycast's font; Geist Mono for codes/dates/counts
+- [x] Monospace applied to: episode codes, dates, watch counts, cast badges, section counts, schedule badges
+- [x] Section headers → uppercase small-caps labels (0.8rem, tx-dim, bottom border)
+- [x] Max-width tightened to 960px (was 1100px)
+- [x] Nav bar height 52px (was 56px), WHIST logotype in Geist Mono with wider letter-spacing
+- [x] Nav bar frosted glass (backdrop-filter blur) — try it, revert if too heavy
+- [x] Schedule cards: left accent-colored border (2.5px) — the Raycast command-list tick
+- [x] Episode rows: tighter padding, lighter separators, recessed unchecked checkbox
+- [x] Poster cards: hover lift (scale 1.02 + shadow), border-radius 10px, thinner progress bar (2px)
+- [x] Seen-in section: stronger border, inset glow, uppercase label — elevates the app's signature feature
+- [x] Badges/chips unified: round-rect (6px), Geist Mono, consistent padding
+- [x] Flexoki 400-tier for dark (current values correct); 600-tier for light — apply from user-provided CSS file
+- [x] Playwright screenshot script: `scripts/screenshot.py`
+
+### Pending page-specific redesigns
+- [ ] Schedule page layout
+- [ ] Library page layout
+- [ ] Show page layout
+- [ ] Season page layout
+- [ ] Episode page layout
+- [ ] Person page layout
+
+### Other items
+- [ ] Mobile-responsive layout polish
+- [ ] Possibly installable as PWA (revisit when mobile layout solid)
+- [ ] Replace horizontal-scroll cast grids with wrapping grid option (actor/character names get cut off)
 - [ ] Show years in the appropriate places
-- [ ] Watch History should be hidden utill asked for, ie not front and center on the page.
+- [ ] Watch History hidden until requested (not front and center on episode page)
 
 ---
 
@@ -182,6 +208,10 @@ Three modes settable per show:
 - [ ] If they're a guest, link to the specific episode
 - [ ] Fix Add to Library 500 Internal Server Error
 - [ ] Import old watchlists from Trakt
+- [ ] I can't mark a whole show as complete and the mark season watched can't handle a second watch
+- [ ] Identify episodes as show premiere, show finale, season premiere, mid season finale, season finale
+- [ ] Identify shows that are on hiatus, either mid season break or between season break
+- [ ] 
 
 ## Out of Scope
 - Multiple user accounts

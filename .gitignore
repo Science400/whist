@@ -38,3 +38,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Screenshots (local iteration only)
+screenshots/
