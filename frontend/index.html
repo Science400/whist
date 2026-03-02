@@ -1566,7 +1566,7 @@
           </div>
           <div style="display:flex;gap:1.25rem;align-items:flex-start;margin-bottom:1.5rem">
             ${data.poster_path
-              ? `<img src="${img(data.poster_path,'w185')}" style="width:72px;border-radius:7px;flex-shrink:0" alt="" loading="lazy">`
+              ? `<img src="${img(data.poster_path,'w185')}" style="width:110px;border-radius:8px;flex-shrink:0;aspect-ratio:2/3;object-fit:cover" alt="" loading="lazy">`
               : ''}
             <div>
               <h1 style="font-size:1.4rem;font-weight:700;color:var(--accent);margin-bottom:0.2rem">${esc(data.name||`Season ${seasonNum}`)}</h1>
