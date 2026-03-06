@@ -187,6 +187,7 @@
     .poster-placeholder {
       width: 100%; aspect-ratio: 2/3;
       background: var(--surface-2);
+      border: 1px solid var(--border);
       border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
       color: var(--tx-dim); font-size: 0.7rem; text-align: center;
@@ -417,7 +418,7 @@
     .sched-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
     .sched-title-row { display: flex; align-items: center; gap: 0.5rem; }
     .sched-title { font-weight: 500; font-size: 0.9rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; min-width: 0; }
-    .sched-ep { font-size: 0.78rem; color: var(--tx-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .sched-ep { display: flex; flex-direction: column; gap: 0.1rem; }
     .sched-date { font-size: 0.72rem; color: var(--tx-dim); }
     .sched-new-badge {
       flex-shrink: 0;
@@ -593,6 +594,8 @@
       color: var(--purple); font-weight: 700;
       font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
       margin-bottom: 0.875rem;
+      padding-left: 0.625rem;
+      border-left: 3px solid var(--purple);
     }
     .seen-in-grid {
       display: flex; gap: 0.875rem;
@@ -691,7 +694,7 @@
     @media (max-width: 640px) {
       #bottom-nav { display: flex; }
       .desktop-only { display: none !important; }
-      #app { padding-bottom: 58px; }
+      #app { padding-bottom: 72px; }
       .page { padding: 1rem; }
       .show-hero { gap: 1rem; }
       .show-poster { width: 80px; }
@@ -1120,7 +1123,7 @@
           + '<div class="sched-info">'
             + '<div class="sched-title-row"><span class="sched-title">' + esc(show.title) + '</span>' + availBadge + paceBadge + '</div>'
             + '<div class="sched-ep"><span class="sched-ep-code">' + esc(code) + '</span>'
-              + (ep.title ? '<span class="sched-ep-title"> \xb7 ' + esc(ep.title) + '</span>' : '') + '</div>'
+              + (ep.title ? '<span class="sched-ep-title">' + esc(ep.title) + '</span>' : '') + '</div>'
             + airDate
             + '<div class="sched-providers"></div>'
           + '</div>'
@@ -1622,7 +1625,7 @@
             </div>
           </div>
           <div class="bulk-actions">
-            <button class="btn btn-accent btn-sm" id="mark-all">Mark Season Watched</button>
+            <button class="btn btn-outline btn-sm" id="mark-all">Mark Season Watched</button>
           </div>
           <div class="episode-list" id="ep-list">
             ${data.episodes.map(epRowHTML).join('')}
