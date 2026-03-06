@@ -130,7 +130,7 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 - [x] Playwright screenshot script: `scripts/screenshot.py`
 
 ### Page-specific redesigns
-- [ ] Schedule page layout
+- [x] Schedule page layout — accent pace badge, ep code in Geist Mono, today's date in header, stepper cap control
 - [x] Library page layout — year and episode count on poster cards, 2-line title clamp
 - [x] Show page — blue accent title, TMDB link, round-rect status/pace buttons, 4-line overview clamp
 - [x] Season page — prev/next season nav, air date inline with ep code, accent left border on watched rows

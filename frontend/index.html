@@ -426,10 +426,14 @@
       font-size: 0.68rem; font-weight: 700;
     }
     .sched-available-badge { flex-shrink: 0; background: var(--orange); color: #fff; border-radius: 6px; padding: 0.15rem 0.5rem; font-size: 0.68rem; font-weight: 600; }
-    .sched-pace-badge { flex-shrink: 0; background: var(--cyan); color: #fff; border-radius: 6px; padding: 0.15rem 0.5rem; font-size: 0.68rem; font-weight: 600; }
-    .sched-status-label { font-size: 0.65rem; color: var(--tx-dim); flex-shrink: 0; }
-    .schedule-cap-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--tx-dim); }
-    .schedule-cap-bar input[type="number"] { width: 52px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--tx); padding: 0.25rem 0.4rem; font-size: 0.82rem; text-align: center; outline: none; }
+    .sched-pace-badge { flex-shrink: 0; background: var(--accent); color: #fff; border-radius: 6px; padding: 0.15rem 0.5rem; font-size: 0.68rem; font-weight: 600; }
+    .sched-ep-code { font-family: 'Geist Mono', monospace; font-size: 0.72rem; color: var(--tx); flex-shrink: 0; }
+    .sched-ep-title { font-size: 0.78rem; color: var(--tx-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .schedule-cap-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--tx-dim); }
+    .cap-stepper { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .cap-stepper button { background: var(--surface-2); border: none; color: var(--tx-dim); width: 28px; height: 28px; font-size: 1rem; cursor: pointer; transition: background 0.1s; }
+    .cap-stepper button:hover { background: var(--border); color: var(--tx); }
+    .cap-stepper span { padding: 0 0.5rem; font-family: 'Geist Mono', monospace; font-size: 0.82rem; color: var(--tx); min-width: 2ch; text-align: center; }
     .schedule-cap-hit { padding: 0.625rem 0.75rem; background: var(--surface); border-radius: 10px; font-size: 0.82rem; color: var(--tx-dim); text-align: center; margin-top: 0.5rem; }
 
     /* ── Pace selector (show detail page) ───────────────────────────────── */
@@ -1107,7 +1111,6 @@
         var nav = '/show/' + show.tmdb_id + '/season/' + ep.season_number + '/episode/' + ep.episode_number;
         var availBadge = available > 1 ? '<span class="sched-available-badge">' + available + ' available</span>' : '';
         var paceBadge  = suggested > 0  ? '<span class="sched-pace-badge">1\u20132 eps</span>' : '';
-        var statusLabel = '<span class="sched-status-label">' + esc(show.user_status === 'airing' ? 'Airing' : 'Watching') + '</span>';
         var poster = show.poster_path
           ? '<img class="sched-poster" src="' + img(show.poster_path, 'w185') + '" alt="' + esc(show.title) + '" loading="lazy">'
           : '<div class="sched-poster"></div>';
@@ -1115,8 +1118,9 @@
         return '<div class="schedule-card" data-nav="' + nav + '" data-show-id="' + show.tmdb_id + '">'
           + poster
           + '<div class="sched-info">'
-            + '<div class="sched-title-row"><span class="sched-title">' + esc(show.title) + '</span>' + availBadge + paceBadge + statusLabel + '</div>'
-            + '<div class="sched-ep">' + esc(code) + (ep.title ? ' \xb7 ' + esc(ep.title) : '') + '</div>'
+            + '<div class="sched-title-row"><span class="sched-title">' + esc(show.title) + '</span>' + availBadge + paceBadge + '</div>'
+            + '<div class="sched-ep"><span class="sched-ep-code">' + esc(code) + '</span>'
+              + (ep.title ? '<span class="sched-ep-title"> \xb7 ' + esc(ep.title) + '</span>' : '') + '</div>'
             + airDate
             + '<div class="sched-providers"></div>'
           + '</div>'
@@ -1136,8 +1140,16 @@
         remaining -= 1;
       }
 
+      var today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
       var capBar = '<div class="schedule-cap-bar">'
-        + '<label>Daily episode cap: <input type="number" id="daily-cap-input" min="1" max="50" value="' + dailyCap + '"></label>'
+        + 'Daily cap'
+        + '<div class="cap-stepper">'
+          + '<button id="cap-dec">\u2212</button>'
+          + '<span id="cap-val">' + dailyCap + '</span>'
+          + '<button id="cap-inc">+</button>'
+        + '</div>'
+        + 'episodes'
         + '</div>';
 
       var body = items.length
@@ -1146,16 +1158,21 @@
           + '<button class="btn btn-accent" style="margin-top:1rem" data-nav="/library">Go to Library</button></div>';
 
       app.innerHTML = '<div class="page">'
-        + '<div class="page-header"><h1>Schedule</h1><p>What to watch today</p></div>'
+        + '<div class="page-header"><h1>Schedule</h1><p>' + today + '</p></div>'
         + capBar
         + body
         + '</div>';
       bindNav(app);
 
-      app.querySelector('#daily-cap-input').addEventListener('change', function() {
-        var v = parseInt(this.value, 10);
-        if (v > 0) { localStorage.setItem('whist_daily_cap', String(v)); pageSchedule(app); }
-      });
+      function updateCap(delta) {
+        var v = Math.max(1, Math.min(50, dailyCap + delta));
+        if (v === dailyCap) return;
+        dailyCap = v;
+        localStorage.setItem('whist_daily_cap', String(v));
+        pageSchedule(app);
+      }
+      app.querySelector('#cap-dec').addEventListener('click', function() { updateCap(-1); });
+      app.querySelector('#cap-inc').addEventListener('click', function() { updateCap(1); });
 
       // Load preferred streaming providers for each unique show (non-blocking).
       var saved = JSON.parse(localStorage.getItem('whist_services') || '[]');
