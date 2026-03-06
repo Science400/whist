@@ -83,6 +83,22 @@ def _run_migrations() -> None:
             conn.execute(text("ALTER TABLE shows ADD COLUMN watch_pace VARCHAR DEFAULT 'binge'"))
             conn.commit()
 
+        # Migration 9: add first_air_date to shows; backfill from earliest episode air_date
+        try:
+            conn.execute(text("SELECT first_air_date FROM shows LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE shows ADD COLUMN first_air_date TEXT"))
+            conn.commit()
+        conn.execute(text("""
+            UPDATE shows
+            SET first_air_date = (
+                SELECT MIN(air_date) FROM episodes
+                WHERE tmdb_show_id = shows.tmdb_id AND air_date IS NOT NULL
+            )
+            WHERE first_air_date IS NULL
+        """))
+        conn.commit()
+
         # Migration 7: add first_air_date to person_credits
         try:
             conn.execute(text("SELECT first_air_date FROM person_credits LIMIT 1"))

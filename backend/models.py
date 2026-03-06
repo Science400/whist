@@ -22,6 +22,7 @@ class Show(Base):
     added_at = Column(String, default=_utcnow)
     last_watched_at = Column(String)
     watch_pace = Column(String, default="binge")      # binge | fast | weekly
+    first_air_date = Column(String)                   # YYYY-MM-DD from TMDB, or None
 
     episodes = relationship("Episode", back_populates="show")
 

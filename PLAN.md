@@ -9,6 +9,21 @@ A working local web app where you can:
 
 ---
 
+## What's Next
+
+**Phase 8 (UI Refresh) — remaining:**
+1. Schedule page layout redesign
+2. Library page layout redesign
+3. Mobile-responsive layout polish
+4. Show years on library poster cards and show page (first air year / year range)
+
+**Bugs & improvements:**
+- Mark a whole show as complete
+- "Mark Season Watched" doesn't support a second watch (rewatch flow)
+- Import old watchlists from Trakt
+
+---
+
 ## Completed Phases
 
 ### Phase 1 — Foundation ✓
@@ -41,13 +56,10 @@ A working local web app where you can:
 
 ---
 
-## Phase 6 — Library & Status Overhaul (next up)
+## Phase 6 — Library & Status Overhaul ✓
 
-### Status taxonomy redesign
+### Status taxonomy redesign ✓
 Replace the 4-bucket system with 5 stored statuses that reflect user intent.
-Key split: **airing** = show still releasing, follow on its schedule;
-**watching** = show complete/far behind, work through at own pace.
-Derived sub-categories (On Hiatus, Airing — caught up, etc.) deferred to Phase 7.
 
 Stored user statuses (5):
 - `airing`    — following a show that is still releasing new episodes
@@ -56,84 +68,43 @@ Stored user statuses (5):
 - `watchlist` — intend to start someday
 - `abandoned` — gave up on it
 
-Note: "hiatus" is derived (not stored) — airing + caught up + no new eps = between seasons.
-
-**Migration mapping** (existing → new):
-- `airing`    → `airing`
-- `caught_up` → `airing`    (caught up = still following an airing show)
-- `binging`   → `watching`  (binging a completed show = watching)
-- `done`      → `finished`  (done = finished watching)
-
-**Backend todos:**
-- [x] `backend/main.py`: add startup migration SQL (safe to re-run; WHERE clause scoped to old values)
-- [x] `backend/routers/shows.py`: update `_VALID_STATUSES` to `{"airing","watching","finished","watchlist","abandoned"}`
-- [x] `backend/routers/schedule.py`: replace `"binging"` with `"watching"` (3 occurrences)
-- [x] `backend/import_trakt.py`: replace `"done"` with `"finished"` in auto-status assignment
-- [x] `backend/models.py`: update `user_status` column comment
-
-**Frontend todos:**
-- [x] Update `STATUS_LABEL` constant (5 entries; `watchlist` and `finished` replace old values)
-- [x] `pageLibrary()`: update groups dict, order, and section colors for 5 sections
-- [x] `pageShow()`: status buttons update automatically from `STATUS_LABEL` (no structural change)
+- [x] `backend/main.py`: status migration SQL
+- [x] `backend/routers/shows.py`: update `_VALID_STATUSES`
+- [x] `backend/routers/schedule.py`: replace `"binging"` with `"watching"`
+- [x] `backend/import_trakt.py`: replace `"done"` with `"finished"`
+- [x] Frontend: `STATUS_LABEL`, library sections, show status buttons
 
 ### Multiple watch dates ✓
-- Unified `watch_history` table holds every watch instance — no primary/secondary distinction.
-- `episodes.watched` + `episodes.watched_at` kept as a denormalized cache for fast queries.
-- UI shows most recent date; pencil/history icon opens full history.
-
-**Backend todos:**
-- [x] Add `watch_history` table: `(id, tmdb_show_id, season_number, episode_number, watched_at)`
-- [x] Migration 5: create table + backfill from existing `episodes.watched_at` (idempotent)
-- [x] Update `POST /episodes/watched` — always appends to `watch_history` (supports rewatches); `watched=false` clears all history entries
-- [x] New `GET /shows/{id}/season/{n}/episode/{e}/watch-history` — all watch dates newest-first
-- [x] New `DELETE /episodes/history/{id}` — remove single entry, re-syncs episode state
-- [x] Update season endpoint to include `watch_count` and most-recent `watched_at` per episode
-
-**Frontend todos:**
-- [x] Season page: `×N` badge on multi-watched episode rows
-- [x] Season page: pencil on watched row opens watch-history popover (list + add/delete)
-- [x] Episode detail page: "+ Log Rewatch" button + watch history section with delete
+- [x] `watch_history` table with full per-episode history
+- [x] Season page: `×N` badge + watch-history popover
+- [x] Episode page: "+ Log Rewatch" + watch history section with delete
 
 ### Progress bars ✓
-- [x] `GET /shows` includes watched/total episode counts per show
-- [x] Poster cards show segmented episode bars (lazy-loaded)
-- [x] Season rows on show page show segmented episode bars
-- [x] Season page header bar segmented; toggles live on check/uncheck
+- [x] Watched/total counts on `GET /shows`; segmented bars on poster cards, season rows, season header
 
-### Other library improvements
+### Other library improvements ✓
 - [x] Search/filter bar
 - [x] Sort options: last watched, A→Z, Z→A, progress ↓, progress ↑
-- [x] Episode progress bars on poster cards
 
 ---
 
-## Phase 7 — Schedule Improvements
+## Phase 7 — Schedule Improvements ✓
 
-### Currently-airing logic
-- Only show a show's episodes if you've *started* the current season.
-  If there are 6+ unwatched aired episodes and you haven't started, skip it —
-  you're not ready to catch up yet. Surface it in "Airing — not started" instead.
-- Once you start a season, show the unwatched aired episodes up to the current one.
+### Currently-airing logic ✓
+- [x] Schedule starts from the highest season with ≥1 watched episode (active season floor)
+- [x] Skips old unstarted seasons; falls back to S1 for new shows
 
-### Binge pace control (for completed shows and rewatches)
-Three modes settable per show:
-- **Binge** — show as many as feel right, no limit
-- **Fast** — surface it every session, 1–2 eps
-- **Weekly** — appear roughly once a week
+### Binge pace control ✓
+Three modes settable per-show: **Binge** (no limit), **Fast** (1–2 eps/session), **Weekly** (~once a week)
+- [x] `watch_pace` column on shows; pace buttons on show page
+- [x] Schedule respects pace when selecting the episode count to surface
 
-### Daily cap
-- Configurable total episode limit for the day's schedule
-- When the cap is hit, stop adding more — prevents overwhelming queues
-- Shows near the cap threshold get priority by last-watched date
-
-### Active season floor ✓
-- Schedule surfaces episodes from the highest season the user has started (≥1 watched ep),
-  skipping old unstarted seasons automatically. Falls back to S1 for brand-new shows.
+### Daily cap ✓
+- [x] Configurable total-episode limit; schedule stops adding after hitting the cap
 
 ### Staleness filtering ✓
-- `airing` and `watching` shows idle for 3+ months are hidden from the schedule.
-- `watching` shows idle for 6+ months are auto-switched to `abandoned` on schedule load.
-- Timestamp format handled: `last_watched_at` stored as full ISO string, sliced to `YYYY-MM-DD` for comparison.
+- [x] `airing`/`watching` idle 3+ months hidden from schedule
+- [x] `watching` idle 6+ months auto-abandoned on schedule load
 
 ### Other schedule items
 - [ ] Upcoming episode calendar — what's airing this week/month
@@ -147,34 +118,30 @@ Three modes settable per show:
 Dark, precise, slightly techy. Per-page accent colors stay (orange=schedule, yellow=library, etc.).
 Screenshot automation: `uv run python scripts/screenshot.py` (requires app running + playwright installed).
 
-### Overall look & feel ✓ (implemented)
-- [x] Geist + Geist Mono fonts (Google Fonts) — Geist is Raycast's font; Geist Mono for codes/dates/counts
-- [x] Monospace applied to: episode codes, dates, watch counts, cast badges, section counts, schedule badges
+### Overall look & feel ✓
+- [x] Geist + Geist Mono fonts — Geist Mono for codes, dates, counts, badges
 - [x] Section headers → uppercase small-caps labels (0.8rem, tx-dim, bottom border)
-- [x] Max-width tightened to 960px (was 1100px)
-- [x] Nav bar height 52px (was 56px), WHIST logotype in Geist Mono with wider letter-spacing
-- [x] Nav bar frosted glass (backdrop-filter blur) — try it, revert if too heavy
-- [x] Schedule cards: left accent-colored border (2.5px) — the Raycast command-list tick
+- [x] Max-width 960px, nav bar 52px with frosted glass
+- [x] Schedule cards: left accent-colored border (Raycast tick)
 - [x] Episode rows: tighter padding, lighter separators, recessed unchecked checkbox
-- [x] Poster cards: hover lift (scale 1.02 + shadow), border-radius 10px, thinner progress bar (2px)
-- [x] Seen-in section: stronger border, inset glow, uppercase label — elevates the app's signature feature
-- [x] Badges/chips unified: round-rect (6px), Geist Mono, consistent padding
-- [x] Flexoki 400-tier for dark (current values correct); 600-tier for light — apply from user-provided CSS file
+- [x] Poster cards: hover lift, border-radius 10px, 2px progress bar
+- [x] Seen-in section: inset glow, uppercase label
+- [x] Badges/chips unified: round-rect (6px), Geist Mono
 - [x] Playwright screenshot script: `scripts/screenshot.py`
 
-### Pending page-specific redesigns
+### Page-specific redesigns
 - [ ] Schedule page layout
-- [ ] Library page layout
-- [x] Show page layout — backdrop gradient fade, blue accent title, TMDB link, round-rect status/pace buttons, overview 4-line clamp with expand
-- [x] Season page layout — prev/next season nav, air date inline with ep code, single watched-date column, accent left border on watched rows, accent "Mark Season Watched" button
-- [x] Episode page layout — hero (still + info side-by-side, 240px thumb), prev/next nav (cross-season), TMDB link, watch history behind toggle
-- [x] Person page layout — accent title, split seen-in (main/guest), guest episode links, year on all credits, accent section headers
+- [x] Library page layout — year and episode count on poster cards, 2-line title clamp
+- [x] Show page — blue accent title, TMDB link, round-rect status/pace buttons, 4-line overview clamp
+- [x] Season page — prev/next season nav, air date inline with ep code, accent left border on watched rows
+- [x] Episode page — hero (still + info, 240px thumb), prev/next nav (cross-season), TMDB link, watch history toggle
+- [x] Person page — accent title, split seen-in (main/guest), guest episode links, year on all credits
 
 ### Other items
 - [ ] Mobile-responsive layout polish
 - [ ] Possibly installable as PWA (revisit when mobile layout solid)
-- [x] Replace horizontal-scroll cast grids with wrapping grid (global — show, episode, person pages); 2-line name clamp
-- [ ] Show years in the appropriate places
+- [x] Show years on library poster cards — year added to poster cards; show page already shows year range in meta line
+- [x] Replace horizontal-scroll cast grids with wrapping grid (global)
 - [x] Watch History hidden behind toggle button with prefetched count
 
 ---
@@ -203,15 +170,18 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 
 ---
 
-## Other Features (To Be Categorized)
-- [x] On a person page, divide their things I've seen them in into main character vs guest
-- [x] If they're a guest, link to the specific episode
-- [ ] Fix Add to Library 500 Internal Server Error
+## Other Features
+
+- [x] On a person page, divide seen-in into main cast vs guest
+- [x] If a guest, link to the specific episode (with background backfill on first visit)
+- [x] Fix Add to Library 500 Internal Server Error
 - [ ] Import old watchlists from Trakt
-- [ ] I can't mark a whole show as complete and the mark season watched can't handle a second watch
-- [ ] Identify episodes as show premiere, show finale, season premiere, mid season finale, season finale
-- [ ] Identify shows that are on hiatus, either mid season break or between season break
-- [ ] 
+- [ ] Mark a whole show as complete
+- [ ] "Mark Season Watched" can't handle a second watch (rewatch flow)
+- [ ] Identify episodes as show premiere, finale, season premiere, mid-season finale, season finale
+- [ ] Identify shows on hiatus (mid-season or between-season)
+- [ ] Mark an episode as dismissed. (probably won't watch it. no need to suggest it)
+- [ ] Links on person page
 
 ## Out of Scope
 - Multiple user accounts

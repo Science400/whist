@@ -111,6 +111,7 @@ class ShowResponse(BaseModel):
     last_watched_at: str | None
     watched_count: int = 0
     total_count: int = 0
+    first_air_date: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -228,6 +229,7 @@ async def add_show(body: ShowAddRequest, db: Session = Depends(get_db)):
         user_status=body.user_status,
         type=body.type,
         added_at=datetime.now(timezone.utc).isoformat(),
+        first_air_date=details.get("first_air_date"),
     )
     db.add(show)
     db.commit()
