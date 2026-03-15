@@ -162,6 +162,28 @@
     .btn-accent:hover { opacity: 0.88; }
     .btn-outline { background: transparent; border: 1.5px solid var(--accent); color: var(--accent); }
     .btn-outline:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    /* ── External links ─────────────────────────────────────────────────── */
+    .ext-links { display: flex; gap: 0.375rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .ext-link {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.6rem; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 500;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--tx-dim); text-decoration: none;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .ext-link:hover { background: var(--border); color: var(--tx); border-color: var(--muted); }
+    .wiki-pill { display: inline-flex; align-items: center; }
+    .wiki-pill .ext-link { border-radius: 6px 0 0 6px; }
+    .wiki-del {
+      display: inline-flex; align-items: center;
+      padding: 0.2rem 0.35rem;
+      border-radius: 0 6px 6px 0; border: 1px solid var(--border); border-left: none;
+      background: var(--surface-2); color: var(--tx-dim);
+      font-size: 0.75rem; line-height: 1; cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+    .wiki-del:hover { background: var(--border); color: var(--tx); }
     .btn-ghost { background: var(--surface-2); color: var(--tx-dim); border: 1px solid var(--border); }
     .btn-ghost:hover { background: var(--border); }
     .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.78rem; }
@@ -725,6 +747,7 @@
       schedule: 'var(--orange)',
       library:  'var(--yellow)',
       show:     'var(--blue)',
+      movie:    'var(--blue)',
       season:   'var(--cyan)',
       episode:  'var(--green)',
       person:   'var(--purple)',
@@ -745,6 +768,7 @@
       if (p[0] === 'add')      return { page: 'add' };
       if (p[0] === 'settings') return { page: 'settings' };
       if (p[0] === 'person')   return { page: 'person', personId: p[1] };
+      if (p[0] === 'movie')    return { page: 'movie', movieId: p[1] };
       if (p[0] === 'show') {
         if (!p[1]) return { page: 'library' };
         if (p[2] === 'season' && p[4] === 'episode')
@@ -771,6 +795,7 @@
         case 'show':     pageShow(app, +r.showId); break;
         case 'season':   pageSeason(app, +r.showId, r.season); break;
         case 'episode':  pageEpisode(app, +r.showId, r.season, r.episode); break;
+        case 'movie':    pageMovie(app, +r.movieId); break;
         case 'person':   pagePerson(app, +r.personId); break;
         case 'settings': pageSettings(app); break;
       }
@@ -798,6 +823,21 @@
     function img(path, size) { return path ? `${IMG}/${size}${path}` : ''; }
     function pad2(n) { return String(n).padStart(2, '0'); }
     function epCode(s, e) { return `S${pad2(s)}E${pad2(e)}`; }
+    // imdbUrl: full URL string, or pass (imdbId, imdbType) to auto-build it
+    function wikiSeasonUrl(w, seasonNum) {
+      return w.season_url_template
+        ? w.season_url_template.replace('{season}', seasonNum)
+        : w.url;
+    }
+    function extLinksHTML(title, imdbId, imdbType, imdbUrl) {
+      const enc = encodeURIComponent(title);
+      const href = imdbUrl || (imdbId ? `https://www.imdb.com/${imdbType}/${imdbId}/` : null);
+      const links = [];
+      if (href) links.push(`<a class="ext-link" href="${href}" target="_blank" rel="noopener">↗ IMDb</a>`);
+      links.push(`<a class="ext-link" href="https://en.wikipedia.org/wiki/Special:Search?search=${enc}" target="_blank" rel="noopener">↗ Wikipedia</a>`);
+      links.push(`<a class="ext-link" href="https://www.rottentomatoes.com/search?search=${enc}" target="_blank" rel="noopener">↗ Rotten Tomatoes</a>`);
+      return `<div class="ext-links">${links.join('')}</div>`;
+    }
     function today() { return new Date().toISOString().slice(0, 10); }
     function yesterday() { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
 
@@ -831,7 +871,7 @@
             <a class="nav-link ${page==='library'?'active':''}" data-nav="/library">Library</a>
           </div>
           <div class="nav-spacer"></div>
-          <a class="nav-icon" data-nav="/add" title="Add Show" style="font-size:1.3rem">+</a>
+          <a class="nav-icon" data-nav="/add" title="Add Show or Movie" style="font-size:1.3rem">+</a>
           <a class="nav-icon desktop-only" data-nav="/settings" title="Settings">⚙</a>
         </div>`;
       bot.innerHTML = `
@@ -1096,6 +1136,20 @@
         </div>`;
     }
 
+    function movieCardHTML(movie) {
+      const href = `/movie/${movie.tmdb_id}`;
+      const year = movie.first_air_date ? movie.first_air_date.slice(0, 4) : '';
+      const watchedLabel = movie.watched ? '✓' : '';
+      return `
+        <div class="poster-card" data-nav="${href}">
+          ${movie.poster_path
+            ? `<img src="${img(movie.poster_path,'w300')}" alt="${esc(movie.title)}" loading="lazy">`
+            : `<div class="poster-placeholder">${esc(movie.title)}</div>`}
+          <div class="card-title">${esc(movie.title)}</div>
+          <div class="card-meta"><span>${year}</span><span style="color:var(--accent)">${watchedLabel}</span></div>
+        </div>`;
+    }
+
     // ── Page: Schedule ───────────────────────────────────────────────────────
     async function pageSchedule(app) {
       var data;
@@ -1197,12 +1251,15 @@
 
     // ── Page: Library ────────────────────────────────────────────────────────
     async function pageLibrary(app) {
-      let shows;
-      try { shows = await get('/shows'); }
-      catch (e) {
+      let shows, movies;
+      try {
+        [shows, movies] = await Promise.all([get('/shows'), get('/movies')]);
+      } catch (e) {
         app.innerHTML = `<div class="page"><div class="empty-state"><h3>Error</h3><p>${esc(e.message)}</p></div></div>`;
         return;
       }
+
+      const totalTracked = shows.length + movies.length;
 
       // Render outer shell once — controls persist across re-renders
       app.innerHTML = `
@@ -1210,12 +1267,12 @@
           <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem">
             <div>
               <h1>My Library</h1>
-              <p id="lib-count">${shows.length} show${shows.length!==1?'s':''} tracked</p>
+              <p id="lib-count">${totalTracked} title${totalTracked!==1?'s':''} tracked</p>
             </div>
-            <button class="btn btn-accent" data-nav="/add">+ Add Show</button>
+            <button class="btn btn-accent" data-nav="/add">+ Add</button>
           </div>
           <div class="library-controls">
-            <input type="search" id="lib-search" placeholder="Search shows…" autocomplete="off">
+            <input type="search" id="lib-search" placeholder="Search library…" autocomplete="off">
             <select id="lib-sort">
               <option value="default">Last watched</option>
               <option value="alpha-asc">A → Z</option>
@@ -1242,42 +1299,53 @@
         const sv = sortSelect.value;
 
         // Filter by search query
-        const filtered = q ? shows.filter(function(s) { return s.title.toLowerCase().includes(q); }) : shows;
+        const filteredShows  = q ? shows.filter(function(s)  { return s.title.toLowerCase().includes(q); }) : shows;
+        const filteredMovies = q ? movies.filter(function(m) { return m.title.toLowerCase().includes(q); }) : movies;
 
-        // Sort (filtered is already in server order = last watched)
-        const sorted = filtered.slice();
+        // Sort shows
+        const sortedShows = filteredShows.slice();
         if (sv === 'alpha-asc') {
-          sorted.sort(function(a, b) { return a.title.localeCompare(b.title); });
+          sortedShows.sort(function(a, b) { return a.title.localeCompare(b.title); });
         } else if (sv === 'alpha-desc') {
-          sorted.sort(function(a, b) { return b.title.localeCompare(a.title); });
+          sortedShows.sort(function(a, b) { return b.title.localeCompare(a.title); });
         } else if (sv === 'progress-hi') {
-          sorted.sort(function(a, b) {
+          sortedShows.sort(function(a, b) {
             const pa = a.total_count ? a.watched_count / a.total_count : 0;
             const pb = b.total_count ? b.watched_count / b.total_count : 0;
             return pb - pa;
           });
         } else if (sv === 'progress-lo') {
-          sorted.sort(function(a, b) {
+          sortedShows.sort(function(a, b) {
             const pa = a.total_count ? a.watched_count / a.total_count : 0;
             const pb = b.total_count ? b.watched_count / b.total_count : 0;
             return pa - pb;
           });
         }
 
-        // Group into status sections
+        // Sort movies
+        const sortedMovies = filteredMovies.slice();
+        if (sv === 'alpha-asc') {
+          sortedMovies.sort(function(a, b) { return a.title.localeCompare(b.title); });
+        } else if (sv === 'alpha-desc') {
+          sortedMovies.sort(function(a, b) { return b.title.localeCompare(a.title); });
+        }
+
+        // Group shows into status sections
         const groups = { airing: [], watching: [], finished: [], watchlist: [], abandoned: [] };
-        sorted.forEach(function(s) {
+        sortedShows.forEach(function(s) {
           (groups[s.user_status] ? groups[s.user_status] : groups.watching).push(s);
         });
 
-        // Render
+        // Group movies into status sections
+        const movieGroups = { finished: [], watchlist: [], abandoned: [] };
+        sortedMovies.forEach(function(m) {
+          (movieGroups[m.user_status] ? movieGroups[m.user_status] : movieGroups.watchlist).push(m);
+        });
+
+        // Render shows
         let html = '';
-        if (!sorted.length) {
-          html = q
-            ? '<div class="empty-state"><p>No shows matching \u201c' + esc(q) + '\u201d</p></div>'
-            : '<div class="empty-state"><h3>No shows tracked yet</h3><p>Add some shows to get started.</p><button class="btn btn-accent" style="margin-top:1rem" data-nav="/add">+ Add Show</button></div>';
-        } else {
-          html = order.filter(function(k) { return groups[k].length; }).map(function(k) {
+        if (sortedShows.length) {
+          html += order.filter(function(k) { return groups[k].length; }).map(function(k) {
             return '<div class="section">'
               + '<div class="section-header">'
               + '<h2 style="color:' + sectionColors[k] + '">' + STATUS_LABEL[k] + '</h2>'
@@ -1288,16 +1356,39 @@
           }).join('');
         }
 
+        // Render movies
+        const movieOrder = ['finished', 'watchlist', 'abandoned'];
+        const movieLabel = { finished: 'Watched', watchlist: 'Watchlist', abandoned: 'Abandoned' };
+        if (sortedMovies.length) {
+          html += movieOrder.filter(function(k) { return movieGroups[k].length; }).map(function(k) {
+            return '<div class="section">'
+              + '<div class="section-header">'
+              + '<h2 style="color:' + sectionColors[k] + '">Movies · ' + movieLabel[k] + '</h2>'
+              + '<span class="section-count">' + movieGroups[k].length + '</span>'
+              + '</div>'
+              + '<div class="poster-grid">' + movieGroups[k].map(movieCardHTML).join('') + '</div>'
+              + '</div>';
+          }).join('');
+        }
+
+        if (!html) {
+          html = q
+            ? '<div class="empty-state"><p>No titles matching \u201c' + esc(q) + '\u201d</p></div>'
+            : '<div class="empty-state"><h3>Nothing tracked yet</h3><p>Add some shows or movies to get started.</p><button class="btn btn-accent" style="margin-top:1rem" data-nav="/add">+ Add</button></div>';
+        }
+
         bodyEl.innerHTML = html;
         bindNav(bodyEl);
 
         // Update count label
+        const total = shows.length + movies.length;
+        const shown = sortedShows.length + sortedMovies.length;
         countEl.textContent = q
-          ? (sorted.length + ' of ' + shows.length + ' show' + (shows.length !== 1 ? 's' : ''))
-          : (shows.length + ' show' + (shows.length !== 1 ? 's' : '') + ' tracked');
+          ? (shown + ' of ' + total + ' title' + (total !== 1 ? 's' : ''))
+          : (total + ' title' + (total !== 1 ? 's' : '') + ' tracked');
 
-        // Inject segment bars from cache or fetch
-        sorted.forEach(function(show) {
+        // Inject segment bars from cache or fetch (shows only)
+        sortedShows.forEach(function(show) {
           const el = bodyEl.querySelector('[data-seg-card="' + show.tmdb_id + '"]');
           if (!el) return;
           if (show.tmdb_id in segCache) {
@@ -1326,13 +1417,17 @@
       renderGrid(); // initial render
     }
 
-    // ── Page: Add Show ───────────────────────────────────────────────────────
+    // ── Page: Add Show/Movie ─────────────────────────────────────────────────
     async function pageAdd(app) {
       app.innerHTML = `
         <div class="page">
           <div class="page-header">
-            <h1>Add Show</h1>
-            <p>Search TMDB to track a show</p>
+            <h1>Add</h1>
+            <p>Search TMDB to track a show or movie</p>
+          </div>
+          <div style="display:flex;gap:0.375rem;margin-bottom:1rem">
+            <button class="status-btn active" id="type-tv">TV Shows</button>
+            <button class="status-btn" id="type-movie">Movies</button>
           </div>
           <input class="search-input" id="q" type="search" placeholder="Search…" autocomplete="off">
           <div id="results"></div>
@@ -1340,9 +1435,26 @@
 
       const input = app.querySelector('#q');
       const results = app.querySelector('#results');
-      let debounce, trackedIds;
+      const btnTV = app.querySelector('#type-tv');
+      const btnMovie = app.querySelector('#type-movie');
+      let debounce, trackedIds = new Set();
+      let mediaType = 'tv';
 
-      get('/shows').then(s => { trackedIds = new Set(s.map(x => x.tmdb_id)); }).catch(() => { trackedIds = new Set(); });
+      Promise.all([get('/shows'), get('/movies')]).then(([s, m]) => {
+        trackedIds = new Set([...s.map(x => x.tmdb_id), ...m.map(x => x.tmdb_id)]);
+      }).catch(() => {});
+
+      function setType(t) {
+        mediaType = t;
+        btnTV.classList.toggle('active', t === 'tv');
+        btnMovie.classList.toggle('active', t === 'movie');
+        results.innerHTML = '';
+        input.value = '';
+        input.focus();
+      }
+
+      btnTV.addEventListener('click', () => setType('tv'));
+      btnMovie.addEventListener('click', () => setType('movie'));
 
       input.focus();
       input.addEventListener('input', () => {
@@ -1352,10 +1464,17 @@
         debounce = setTimeout(async () => {
           results.innerHTML = '<div class="loading">Searching…</div>';
           try {
-            const res = await post('/shows/search', { query: q });
+            let res;
+            if (mediaType === 'movie') {
+              res = await get('/movies/search?q=' + encodeURIComponent(q));
+              res = res.map(r => ({ ...r, first_air_date: r.release_date, _nav: `/movie/${r.tmdb_id}` }));
+            } else {
+              res = await post('/shows/search', { query: q });
+              res = res.map(r => ({ ...r, _nav: `/show/${r.tmdb_id}` }));
+            }
             if (!res.length) { results.innerHTML = '<div class="empty-state"><p>No results.</p></div>'; return; }
             results.innerHTML = `<div class="search-results">${res.map(r => `
-              <div class="search-result" data-nav="/show/${r.tmdb_id}">
+              <div class="search-result" data-nav="${r._nav}">
                 ${r.poster_path
                   ? `<img class="search-result-poster" src="${img(r.poster_path,'w92')}" alt="${esc(r.title)}">`
                   : `<div class="search-result-poster"></div>`}
@@ -1457,7 +1576,21 @@
             <div class="show-info">
               <h1 class="show-title">${esc(detail.title)}</h1>
               <div class="show-meta">${esc(meta)}</div>
-              <a href="https://www.themoviedb.org/tv/${tmdbId}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none;display:inline-block;margin-bottom:0.625rem">↗ TMDB</a>
+              <a href="https://www.themoviedb.org/tv/${tmdbId}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none;display:inline-block;margin-bottom:0.375rem">↗ TMDB</a>
+              <div class="ext-links" id="wiki-pills">
+                ${(detail.wikis||[]).map(w => `<span class="wiki-pill"><a class="ext-link" href="${esc(w.url)}" target="_blank" rel="noopener">↗ ${esc(w.label)}</a><button class="wiki-del" data-wiki-id="${w.id}" title="Remove">×</button></span>`).join('')}
+              </div>
+              ${extLinksHTML(detail.title, detail.imdb_id, 'title')}
+              <div id="wiki-add-area" style="margin-top:0.25rem">
+                <button class="ext-link" id="wiki-add-btn" style="cursor:pointer;border-style:dashed">+ Add wiki</button>
+                <div id="wiki-form" style="display:none;margin-top:0.4rem;gap:0.4rem;align-items:center;flex-wrap:wrap">
+                  <input id="wiki-label" placeholder="Label (e.g. Memory Alpha)" style="font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--tx);width:160px">
+                  <input id="wiki-url" placeholder="Show URL (https://...)" style="font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--tx);width:220px">
+                  <input id="wiki-season-tmpl" placeholder="Season URL with {season} (optional)" style="font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--tx);width:260px">
+                  <button class="ext-link" id="wiki-save" style="cursor:pointer">Save</button>
+                  <button class="ext-link" id="wiki-cancel" style="cursor:pointer">Cancel</button>
+                </div>
+              </div>
               ${statusHTML}
               ${progressHTML}
               <div id="watch-providers"></div>
@@ -1525,6 +1658,44 @@
             });
           } catch(e) { alert('Error: ' + e.message); }
         });
+      });
+
+      // Custom wiki links
+      app.querySelectorAll('.wiki-del').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await del(`/shows/${tmdbId}/wikis/${btn.dataset.wikiId}`);
+            btn.closest('.wiki-pill').remove();
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+      });
+      const wikiForm = app.querySelector('#wiki-form');
+      app.querySelector('#wiki-add-btn').addEventListener('click', () => {
+        wikiForm.style.display = wikiForm.style.display === 'none' ? 'flex' : 'none';
+      });
+      app.querySelector('#wiki-cancel').addEventListener('click', () => {
+        wikiForm.style.display = 'none';
+      });
+      app.querySelector('#wiki-save').addEventListener('click', async () => {
+        const label = app.querySelector('#wiki-label').value.trim();
+        const url   = app.querySelector('#wiki-url').value.trim();
+        const tmpl  = app.querySelector('#wiki-season-tmpl').value.trim() || null;
+        if (!label || !url) return;
+        try {
+          const wiki = await post(`/shows/${tmdbId}/wikis`, { label, url, season_url_template: tmpl });
+          const pill = document.createElement('span');
+          pill.className = 'wiki-pill';
+          pill.innerHTML = `<a class="ext-link" href="${esc(wiki.url)}" target="_blank" rel="noopener">↗ ${esc(wiki.label)}</a><button class="wiki-del" data-wiki-id="${wiki.id}" title="Remove">×</button>`;
+          pill.querySelector('.wiki-del').addEventListener('click', async () => {
+            try { await del(`/shows/${tmdbId}/wikis/${wiki.id}`); pill.remove(); }
+            catch(e) { alert('Error: ' + e.message); }
+          });
+          app.querySelector('#wiki-pills').appendChild(pill);
+          wikiForm.style.display = 'none';
+          app.querySelector('#wiki-label').value = '';
+          app.querySelector('#wiki-url').value = '';
+          app.querySelector('#wiki-season-tmpl').value = '';
+        } catch(e) { alert('Error: ' + e.message); }
       });
 
       // Add banner
@@ -1621,6 +1792,11 @@
               <div style="color:var(--tx-dim);font-size:0.82rem">${data.air_date?data.air_date+' · ':''}${total} episodes</div>
               <div class="progress-row" style="margin-top:0.5rem" id="prog-text">${watched} / ${total} watched</div>
               <div id="prog-bar" style="max-width:220px;margin-top:0.3rem">${headerSegBar}</div>
+              <div style="margin-top:0.5rem">
+                <a href="https://www.themoviedb.org/tv/${tmdbId}/season/${seasonNum}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none;display:inline-block;margin-bottom:0.375rem">↗ TMDB</a>
+                <div class="ext-links">${(detailData.wikis||[]).map(w => `<a class="ext-link" href="${esc(wikiSeasonUrl(w, seasonNum))}" target="_blank" rel="noopener">↗ ${esc(w.label)}</a>`).join('')}</div>
+                ${extLinksHTML(detailData.title + ' Season ' + seasonNum, null, null, detailData.imdb_id ? `https://www.imdb.com/title/${detailData.imdb_id}/episodes/?season=${seasonNum}` : null)}
+              </div>
               <div id="season-providers"></div>
             </div>
           </div>
@@ -1798,7 +1974,9 @@
                   : `<button class="btn btn-accent" id="ep-watch">Mark Watched</button>
                      <button class="btn btn-outline btn-sm" id="ep-watch-date">Log with date</button>`}
               </div>
-              <a href="${tmdbEpUrl}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none">↗ TMDB</a>
+              <a href="${tmdbEpUrl}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none;display:inline-block;margin-bottom:0.375rem">↗ TMDB</a>
+              <div class="ext-links">${(detailData.wikis||[]).map(w => `<a class="ext-link" href="${esc(wikiSeasonUrl(w, seasonNum))}" target="_blank" rel="noopener">↗ ${esc(w.label)}</a>`).join('')}</div>
+              ${extLinksHTML(ep.title || epCode(seasonNum, epNum) + ' ' + detailData.title, null, null, detailData.imdb_id ? `https://www.imdb.com/title/${detailData.imdb_id}/episodes/?season=${seasonNum}` : null)}
             </div>
           </div>
           ${ep.watched ? `<button class="wh-toggle-btn" id="wh-toggle"><span id="wh-arrow">▸</span> Watch history (<span id="wh-count">…</span>)</button>
@@ -1932,6 +2110,146 @@
       });
     }
 
+    // ── Page: Movie ──────────────────────────────────────────────────────────
+    async function pageMovie(app, tmdbId) {
+      let detail;
+      try { detail = await get(`/movies/${tmdbId}`); }
+      catch(e) {
+        app.innerHTML = `<div class="page"><div class="empty-state"><h3>Movie not found</h3></div></div>`;
+        return;
+      }
+
+      const year = detail.release_date || '';
+      const genres = (detail.genres || []).join(', ');
+      const runtime = detail.runtime ? `${detail.runtime} min` : '';
+      const meta = [year, runtime, genres].filter(Boolean).join(' · ');
+
+      const MOVIE_STATUS_LABEL = { watchlist: 'Watchlist', finished: 'Finished', abandoned: 'Abandoned' };
+      const MOVIE_STATUS_COLOR = { watchlist: 'var(--blue)', finished: 'var(--cyan)', abandoned: 'var(--muted)' };
+
+      const addBannerHTML = !detail.tracked ? `
+        <div class="add-banner" id="add-banner">
+          <h3>Add to Library</h3>
+          <p>Choose a status to start tracking</p>
+          <div class="add-status-row">
+            ${Object.entries(MOVIE_STATUS_LABEL).map(([k,v]) =>
+              `<button class="add-status-opt ${k==='watchlist'?'selected':''}" data-status="${k}">${v}</button>`
+            ).join('')}
+          </div>
+          <button class="btn btn-accent" id="add-btn" style="margin-top:0.5rem">Add to Library</button>
+        </div>` : '';
+
+      const statusHTML = detail.tracked ? `
+        <div class="status-selector">
+          ${Object.entries(MOVIE_STATUS_LABEL).map(([k,v]) =>
+            `<button class="status-btn ${detail.user_status===k?'active':''}" data-status="${k}">${v}</button>`
+          ).join('')}
+        </div>` : '';
+
+      const watchedBtnLabel = detail.watched ? '✓ Watched' : 'Mark Watched';
+      const watchedBtnClass = detail.watched ? 'btn-accent' : 'btn-outline';
+      const watchedHTML = detail.tracked ? `
+        <div style="margin:0.75rem 0">
+          <button class="btn ${watchedBtnClass}" id="watched-btn">${watchedBtnLabel}</button>
+          ${detail.watched_at ? `<span style="font-size:0.78rem;color:var(--tx-dim);margin-left:0.75rem">${detail.watched_at}</span>` : ''}
+        </div>` : '';
+
+      app.innerHTML = `
+        <div class="page">
+          <div class="breadcrumb">
+            <a data-nav="/library">Library</a>
+          </div>
+          ${addBannerHTML}
+          <div class="show-hero">
+            ${detail.poster_path
+              ? `<img class="show-poster" src="${img(detail.poster_path,'w300')}" alt="${esc(detail.title)}">`
+              : ''}
+            <div class="show-info">
+              <h1 class="show-title">${esc(detail.title)}</h1>
+              <div class="show-meta">${esc(meta)}</div>
+              <a href="https://www.themoviedb.org/movie/${tmdbId}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none;display:inline-block;margin-bottom:0.375rem">↗ TMDB</a>
+              ${extLinksHTML(detail.title, detail.imdb_id, 'title')}
+              ${statusHTML}
+              ${watchedHTML}
+              ${detail.overview
+                ? `<p class="show-overview${detail.overview.length > 280 ? ' show-overview-clamped' : ''}" id="show-overview">${esc(detail.overview)}</p>
+                   ${detail.overview.length > 280 ? `<span class="show-more-btn" id="show-more">Show more ▾</span>` : ''}`
+                : ''}
+            </div>
+          </div>
+          <div class="section" style="margin-top:1.75rem">
+            <div class="section-header"><h2 style="color:var(--accent)">Cast</h2></div>
+            <div id="cast-pane"><div class="loading" style="padding:0.5rem 0;text-align:left;font-size:0.85rem">Loading cast…</div></div>
+          </div>
+        </div>`;
+
+      bindNav(app);
+
+      app.querySelector('#show-more')?.addEventListener('click', function() {
+        app.querySelector('#show-overview')?.classList.remove('show-overview-clamped');
+        this.remove();
+      });
+
+      // Status buttons
+      app.querySelectorAll('.status-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await patch(`/movies/${tmdbId}/status`, { user_status: btn.dataset.status });
+            app.querySelectorAll('.status-btn').forEach(b =>
+              b.classList.toggle('active', b.dataset.status === btn.dataset.status));
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+      });
+
+      // Watched toggle
+      app.querySelector('#watched-btn')?.addEventListener('click', async () => {
+        try {
+          const res = await post(`/movies/${tmdbId}/watched`, {});
+          const btn = app.querySelector('#watched-btn');
+          if (res.watched) {
+            btn.textContent = '✓ Watched';
+            btn.className = 'btn btn-accent';
+          } else {
+            btn.textContent = 'Mark Watched';
+            btn.className = 'btn btn-outline';
+          }
+        } catch(e) { alert('Error: ' + e.message); }
+      });
+
+      // Add banner
+      if (!detail.tracked) {
+        let selStatus = 'watchlist';
+        app.querySelectorAll('.add-status-opt').forEach(o => {
+          o.addEventListener('click', () => {
+            selStatus = o.dataset.status;
+            app.querySelectorAll('.add-status-opt').forEach(x => x.classList.toggle('selected', x===o));
+          });
+        });
+        app.querySelector('#add-btn')?.addEventListener('click', async () => {
+          try {
+            await post('/movies', { tmdb_id: tmdbId, user_status: selStatus });
+            navigate(`/movie/${tmdbId}`);
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+      }
+
+      // Load cast (non-blocking) — only works if movie is tracked
+      if (detail.tracked) {
+        get(`/movies/${tmdbId}/cast`).then(cast => {
+          const pane = app.querySelector('#cast-pane');
+          if (!pane) return;
+          pane.innerHTML = castGridHTML(cast);
+          bindNav(pane);
+        }).catch(() => {
+          const pane = app.querySelector('#cast-pane');
+          if (pane) pane.innerHTML = '';
+        });
+      } else {
+        const pane = app.querySelector('#cast-pane');
+        if (pane) pane.innerHTML = '<p style="color:var(--tx-dim);font-size:0.85rem">Add movie to library to see cast.</p>';
+      }
+    }
+
     // ── Page: Person ─────────────────────────────────────────────────────────
     async function pagePerson(app, tmdbId) {
       let data;
@@ -1955,15 +2273,19 @@
         <div class="seen-in-section">
           <div class="seen-in-label">Main cast in ${main_cast.length} title${main_cast.length!==1?'s':''} you've watched</div>
           <div class="seen-in-grid">
-            ${main_cast.map(c => `
-              <div class="seen-in-card" data-nav="/show/${c.tmdb_id}">
+            ${main_cast.map(c => {
+              const nav = c.type === 'movie' ? `/movie/${c.tmdb_id}` : `/show/${c.tmdb_id}`;
+              return `
+              <div class="seen-in-card" data-nav="${nav}">
                 ${c.poster_path
                   ? `<img src="${img(c.poster_path,'w185')}" alt="${esc(c.title)}" loading="lazy">`
                   : `<div class="seen-in-card-placeholder">${esc(c.title)}</div>`}
                 <div class="seen-in-title">${esc(c.title)}</div>
                 <div class="seen-in-char">${esc(c.character||'')}</div>
-                ${c.first_air_date ? `<div class="seen-in-year">${c.first_air_date.slice(0,4)}</div>` : ''}
-              </div>`).join('')}
+                ${c.type === 'movie' ? '<div class="seen-in-year" style="color:var(--blue)">Movie</div>' : ''}
+                ${(() => { const p=[c.first_air_date?c.first_air_date.slice(0,4):null,c.age_at_filming!=null?`age ${c.age_at_filming}`:null].filter(Boolean); return p.length?`<div class="seen-in-year">${p.join(' · ')}</div>`:''; })()}
+              </div>`;
+            }).join('')}
           </div>
         </div>` : '';
 
@@ -1972,16 +2294,20 @@
           <div class="section-header"><h2 style="color:var(--accent)">Guest Appearances</h2></div>
           <div>
             ${guest.map(c => {
-              const nav = (c.season_number && c.episode_number)
-                ? `/show/${c.tmdb_id}/season/${c.season_number}/episode/${c.episode_number}`
-                : `/show/${c.tmdb_id}`;
-              const epLabel = (c.season_number && c.episode_number)
+              const isMovie = c.type === 'movie';
+              const nav = isMovie
+                ? `/movie/${c.tmdb_id}`
+                : (c.season_number && c.episode_number)
+                  ? `/show/${c.tmdb_id}/season/${c.season_number}/episode/${c.episode_number}`
+                  : `/show/${c.tmdb_id}`;
+              const epLabel = (!isMovie && c.season_number && c.episode_number)
                 ? ' · ' + epCode(c.season_number, c.episode_number)
                 : '';
+              const typeLabel = isMovie ? ' · Movie' : '';
               return `<div class="guest-row" data-nav="${nav}">
                 <div class="guest-info">
                   <div class="guest-show-title">${esc(c.title)}</div>
-                  <div class="guest-detail">${esc(c.character||'')}${epLabel}${c.first_air_date?' · '+c.first_air_date.slice(0,4):''}</div>
+                  <div class="guest-detail">${esc(c.character||'')}${epLabel}${typeLabel}${c.first_air_date?' · '+c.first_air_date.slice(0,4):''}${c.age_at_filming!=null?' · age '+c.age_at_filming:''}</div>
                 </div>
               </div>`;
             }).join('')}
@@ -2001,6 +2327,8 @@
               : `<div class="person-photo-placeholder">👤</div>`}
             <div>
               <h1 class="person-name">${esc(person.name)}</h1>
+              <a href="https://www.themoviedb.org/person/${tmdbId}" target="_blank" rel="noopener" style="font-size:0.78rem;color:var(--tx-dim);text-decoration:none;display:inline-block;margin-bottom:0.375rem">↗ TMDB</a>
+              ${extLinksHTML(person.name, person.imdb_id, 'name')}
             </div>
           </div>
           ${mainHTML}${guestHTML}${noSeenHTML}
@@ -2024,7 +2352,7 @@
           app.querySelector('#all-credits').innerHTML = `
             <div class="credits-list">
               ${credits.map(c => `
-                <div class="credit-row" data-nav="/show/${c.show_tmdb_id}">
+                <div class="credit-row" data-nav="/${c.type === 'movie' ? 'movie' : 'show'}/${c.show_tmdb_id}">
                   ${c.poster_path
                     ? `<img class="credit-poster" src="${img(c.poster_path,'w92')}" alt="${esc(c.title)}" loading="lazy">`
                     : `<div class="credit-poster-ph"></div>`}

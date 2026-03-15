@@ -15,6 +15,12 @@ _VALID_STATUSES = {"airing", "watching", "finished", "watchlist", "abandoned"}
 _VALID_PACES    = {"binge", "fast", "weekly"}
 
 
+class WikiRequest(BaseModel):
+    label: str
+    url: str
+    season_url_template: str | None = None
+
+
 def _norm_name(name: str) -> str:
     """Normalize brand symbols so 'Paramount+' and 'Paramount Plus' compare equal."""
     return (
@@ -144,6 +150,11 @@ async def get_show_detail(tmdb_id: int, db: Session = Depends(get_db)):
         select(models.Show).where(models.Show.tmdb_id == tmdb_id)
     ).scalar_one_or_none()
 
+    wikis = db.execute(
+        select(models.ShowWiki).where(models.ShowWiki.show_tmdb_id == tmdb_id)
+        .order_by(models.ShowWiki.id)
+    ).scalars().all()
+
     try:
         details = await tmdb.get_show(tmdb_id)
     except Exception:
@@ -161,6 +172,8 @@ async def get_show_detail(tmdb_id: int, db: Session = Depends(get_db)):
         "first_air_date": details.get("first_air_date", "")[:4],  # year only
         "last_air_date": details.get("last_air_date", "")[:4],
         "tmdb_status": details.get("status"),   # "Returning Series", "Ended", etc.
+        "imdb_id": details.get("external_ids", {}).get("imdb_id"),
+        "wikis": [{"id": w.id, "label": w.label, "url": w.url, "season_url_template": w.season_url_template} for w in wikis],
         "networks": [n.get("name") for n in details.get("networks", [])],
         "seasons": [
             {
@@ -275,6 +288,45 @@ def update_show_pace(tmdb_id: int, body: ShowPaceRequest, db: Session = Depends(
     return {"tmdb_id": tmdb_id, "watch_pace": show.watch_pace}
 
 
+@router.post("/{tmdb_id}/wikis")
+def add_show_wiki(tmdb_id: int, body: WikiRequest, db: Session = Depends(get_db)):
+    """Add a custom wiki link to a tracked show."""
+    show = db.execute(
+        select(models.Show).where(models.Show.tmdb_id == tmdb_id)
+    ).scalar_one_or_none()
+    if not show:
+        raise HTTPException(status_code=404, detail="Show not tracked")
+    for u in [body.url, body.season_url_template]:
+        if u and not u.startswith(("http://", "https://")):
+            raise HTTPException(status_code=422, detail="URLs must start with http:// or https://")
+    wiki = models.ShowWiki(
+        show_tmdb_id=tmdb_id,
+        label=body.label.strip(),
+        url=body.url.strip(),
+        season_url_template=body.season_url_template.strip() if body.season_url_template else None,
+    )
+    db.add(wiki)
+    db.commit()
+    db.refresh(wiki)
+    return {"id": wiki.id, "label": wiki.label, "url": wiki.url, "season_url_template": wiki.season_url_template}
+
+
+@router.delete("/{tmdb_id}/wikis/{wiki_id}")
+def delete_show_wiki(tmdb_id: int, wiki_id: int, db: Session = Depends(get_db)):
+    """Remove a custom wiki link from a show."""
+    wiki = db.execute(
+        select(models.ShowWiki).where(
+            models.ShowWiki.id == wiki_id,
+            models.ShowWiki.show_tmdb_id == tmdb_id,
+        )
+    ).scalar_one_or_none()
+    if not wiki:
+        raise HTTPException(status_code=404, detail="Wiki not found")
+    db.delete(wiki)
+    db.commit()
+    return {"deleted": wiki_id}
+
+
 @router.get("", response_model=list[ShowResponse])
 def list_shows(db: Session = Depends(get_db)):
     """List all tracked shows with episode progress, ordered by most recently watched first."""
@@ -284,6 +336,7 @@ def list_shows(db: Session = Depends(get_db)):
             func.count(models.Episode.id).label("total_count"),
             func.sum(case((models.Episode.watched == True, 1), else_=0)).label("watched_count"),
         )
+        .where(models.Show.type == "tv")
         .outerjoin(models.Episode, models.Episode.tmdb_show_id == models.Show.tmdb_id)
         .group_by(models.Show.id)
         .order_by(models.Show.last_watched_at.desc().nulls_last())

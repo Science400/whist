@@ -21,10 +21,10 @@ async def search_tv(query: str) -> list[dict]:
 
 
 async def get_show(tmdb_id: int) -> dict:
-    """GET /tv/{tmdb_id}"""
+    """GET /tv/{tmdb_id}?append_to_response=external_ids"""
     r = await _client.get(
         f"/tv/{tmdb_id}",
-        params={"api_key": settings.tmdb_api_key},
+        params={"api_key": settings.tmdb_api_key, "append_to_response": "external_ids"},
     )
     r.raise_for_status()
     return r.json()
@@ -74,6 +74,36 @@ async def get_episode_credits(tmdb_id: int, season_number: int, episode_number: 
     """GET /tv/{tmdb_id}/season/{season}/episode/{episode}/credits — cast + guest_stars"""
     r = await _client.get(
         f"/tv/{tmdb_id}/season/{season_number}/episode/{episode_number}/credits",
+        params={"api_key": settings.tmdb_api_key},
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+async def search_movie(query: str) -> list[dict]:
+    """GET /search/movie?query={title}"""
+    r = await _client.get(
+        "/search/movie",
+        params={"query": query, "api_key": settings.tmdb_api_key},
+    )
+    r.raise_for_status()
+    return r.json().get("results", [])
+
+
+async def get_movie(tmdb_id: int) -> dict:
+    """GET /movie/{tmdb_id}"""
+    r = await _client.get(
+        f"/movie/{tmdb_id}",
+        params={"api_key": settings.tmdb_api_key},
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+async def get_movie_credits(tmdb_id: int) -> dict:
+    """GET /movie/{tmdb_id}/credits — returns {cast: [...], crew: [...]}"""
+    r = await _client.get(
+        f"/movie/{tmdb_id}/credits",
         params={"api_key": settings.tmdb_api_key},
     )
     r.raise_for_status()

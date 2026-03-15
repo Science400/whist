@@ -149,7 +149,7 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 ## Phase 9 — Content Enrichment
 
 - [ ] Actor ages at time of filming (season air year − birth year)
-- [ ] Movie tracking (DB schema already supports it)
+- [x] Movie tracking (DB schema already supports it)
 - [ ] External links — TMDB, IMDb, Wikipedia, Rotten Tomatoes on show/person pages
 - [ ] Genre and network metadata for filtering
 
@@ -182,6 +182,9 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 - [ ] Identify shows on hiatus (mid-season or between-season)
 - [ ] Mark an episode as dismissed. (probably won't watch it. no need to suggest it)
 - [ ] Links on person page
+- [ ] All of the page titles are just WHIST so going back in my history isn't useful.
+- [ ] Shows on a people page that aren't in my library should link to TMDB
+- [ ] Mark an entire show or season as watched with no date
 
 ## Out of Scope
 - Multiple user accounts

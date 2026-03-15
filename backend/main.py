@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import text
 
 from backend.database import Base, engine
-from backend.routers import episodes, people, schedule, shows
+from backend.routers import episodes, movies, people, schedule, shows
 
 # Create all tables on startup (idempotent)
 Base.metadata.create_all(bind=engine)
@@ -106,6 +106,43 @@ def _run_migrations() -> None:
             conn.execute(text("ALTER TABLE person_credits ADD COLUMN first_air_date TEXT"))
             conn.commit()
 
+        # Migration 10: add watched + watched_at to shows (for movies)
+        try:
+            conn.execute(text("SELECT watched FROM shows LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE shows ADD COLUMN watched BOOLEAN DEFAULT 0"))
+            conn.execute(text("ALTER TABLE shows ADD COLUMN watched_at TEXT"))
+            conn.commit()
+
+        # Migration 11: add birthday to people
+        try:
+            conn.execute(text("SELECT birthday FROM people LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE people ADD COLUMN birthday TEXT"))
+            conn.commit()
+
+        # Migration 12: add imdb_id to people
+        try:
+            conn.execute(text("SELECT imdb_id FROM people LIMIT 1"))
+        except Exception:
+            conn.execute(text("ALTER TABLE people ADD COLUMN imdb_id TEXT"))
+            conn.commit()
+
+        # Migration 13: create show_wikis table
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS show_wikis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                show_tmdb_id INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                url TEXT NOT NULL,
+                season_url_template TEXT
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_show_wikis_show ON show_wikis (show_tmdb_id)"
+        ))
+        conn.commit()
+
         # Migration 8: create episode_credits table
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS episode_credits (
@@ -139,6 +176,7 @@ app.add_middleware(
 )
 
 app.include_router(shows.router)
+app.include_router(movies.router)
 app.include_router(episodes.router)
 app.include_router(people.router)
 app.include_router(schedule.router)

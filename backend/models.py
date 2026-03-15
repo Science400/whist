@@ -23,6 +23,8 @@ class Show(Base):
     last_watched_at = Column(String)
     watch_pace = Column(String, default="binge")      # binge | fast | weekly
     first_air_date = Column(String)                   # YYYY-MM-DD from TMDB, or None
+    watched = Column(Boolean, default=False)          # movies only: watched flag
+    watched_at = Column(String)                       # movies only: ISO 8601 date
 
     episodes = relationship("Episode", back_populates="show")
 
@@ -55,6 +57,8 @@ class Person(Base):
     tmdb_id = Column(Integer, unique=True, nullable=False, index=True)
     name = Column(String, nullable=False)
     profile_path = Column(String)
+    birthday = Column(String)                 # YYYY-MM-DD, nullable
+    imdb_id = Column(String)
     credits_cached_at = Column(String)
 
     credits = relationship("PersonCredit", back_populates="person")
@@ -105,6 +109,16 @@ class EpisodeCredit(Base):
     season_number  = Column(Integer, nullable=False)
     episode_number = Column(Integer, nullable=False)
     character      = Column(String)
+
+
+class ShowWiki(Base):
+    __tablename__ = "show_wikis"
+
+    id = Column(Integer, primary_key=True, index=True)
+    show_tmdb_id = Column(Integer, nullable=False, index=True)
+    label = Column(String, nullable=False)       # user-defined, e.g. "Memory Alpha"
+    url = Column(String, nullable=False)         # show-level URL
+    season_url_template = Column(String)         # optional, e.g. ".../Season_{season}"
 
 
 class ShowCast(Base):
