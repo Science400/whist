@@ -21,6 +21,7 @@ A working local web app where you can:
 - Mark a whole show as complete
 - "Mark Season Watched" doesn't support a second watch (rewatch flow)
 - Import old watchlists from Trakt
+- [x] Episode caching: `_cache_season` always upserts missing episodes from TMDB; `POST /admin/refresh-episodes` backfills all shows
 
 ---
 

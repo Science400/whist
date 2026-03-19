@@ -12,6 +12,36 @@ from backend import models, tmdb
 router = APIRouter(tags=["episodes"])
 
 
+async def _cache_season(show: models.Show, season_number: int, db: Session) -> None:
+    """Fetch a season from TMDB and upsert any missing episodes. Always runs (no skip)."""
+    try:
+        season_data = await tmdb.get_season(show.tmdb_id, season_number)
+    except Exception:
+        return
+    for ep in season_data.get("episodes", []):
+        ep_num = ep.get("episode_number")
+        if ep_num is None:
+            continue
+        exists = db.execute(
+            select(models.Episode).where(
+                models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.season_number == season_number,
+                models.Episode.episode_number == ep_num,
+            )
+        ).scalar_one_or_none()
+        if not exists:
+            db.add(models.Episode(
+                show_id=show.id,
+                tmdb_show_id=show.tmdb_id,
+                season_number=season_number,
+                episode_number=ep_num,
+                title=ep.get("name"),
+                air_date=ep.get("air_date"),
+                watched=False,
+            ))
+    db.commit()
+
+
 async def _ensure_episodes_cached(show: models.Show, db: Session) -> None:
     """Fetch and cache all non-special seasons from TMDB if not yet cached."""
     count = db.execute(
@@ -26,32 +56,7 @@ async def _ensure_episodes_cached(show: models.Show, db: Session) -> None:
         season_num = season["season_number"]
         if season_num == 0:  # skip specials
             continue
-        try:
-            season_data = await tmdb.get_season(show.tmdb_id, season_num)
-        except Exception:
-            continue
-        for ep in season_data.get("episodes", []):
-            ep_num = ep.get("episode_number")
-            if ep_num is None:
-                continue
-            exists = db.execute(
-                select(models.Episode).where(
-                    models.Episode.tmdb_show_id == show.tmdb_id,
-                    models.Episode.season_number == season_num,
-                    models.Episode.episode_number == ep_num,
-                )
-            ).scalar_one_or_none()
-            if not exists:
-                db.add(models.Episode(
-                    show_id=show.id,
-                    tmdb_show_id=show.tmdb_id,
-                    season_number=season_num,
-                    episode_number=ep_num,
-                    title=ep.get("name"),
-                    air_date=ep.get("air_date"),
-                    watched=False,
-                ))
-    db.commit()
+        await _cache_season(show, season_num, db)
 
 
 @router.get("/shows/{tmdb_show_id}/episodes")
@@ -268,12 +273,20 @@ def _resolve_date(watched_at: str | None) -> str | None:
 # --- Endpoints ---
 
 @router.post("/episodes/watched")
-def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_db)):
+async def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_db)):
     """Mark a single episode watched or unwatched.
 
     watched=True: insert a new watch_history entry (always appends — supports rewatches).
     watched=False: delete all watch_history entries for this episode and clear the episode.
     """
+    show = db.execute(
+        select(models.Show).where(models.Show.tmdb_id == body.tmdb_show_id)
+    ).scalar_one_or_none()
+    if not show:
+        raise HTTPException(status_code=404, detail="Show not tracked")
+
+    await _cache_season(show, body.season_number, db)
+
     ep = db.execute(
         select(models.Episode).where(
             models.Episode.tmdb_show_id == body.tmdb_show_id,
@@ -282,10 +295,7 @@ def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_db)):
         )
     ).scalar_one_or_none()
     if not ep:
-        raise HTTPException(
-            status_code=404,
-            detail="Episode not found — open the Episodes panel first to cache them",
-        )
+        raise HTTPException(status_code=404, detail="Episode not found")
 
     if body.watched:
         resolved = _resolve_date(body.watched_at)
@@ -434,3 +444,28 @@ def delete_history_entry(entry_id: int, db: Session = Depends(get_db)):
         )
     ).scalar()
     return {"deleted": True, "watch_count": watch_count, "watched": ep.watched if ep else False}
+
+
+@router.post("/admin/refresh-episodes")
+async def refresh_all_episodes(db: Session = Depends(get_db)):
+    """Re-cache episodes for every tracked show, filling gaps from TMDB.
+
+    Safe to run multiple times — only inserts missing episodes.
+    Use this to fix shows imported from Trakt that have partial episode data.
+    """
+    shows = db.execute(select(models.Show).where(models.Show.type == "tv")).scalars().all()
+    results = []
+    for show in shows:
+        try:
+            details = await tmdb.get_show(show.tmdb_id)
+        except Exception as e:
+            results.append({"tmdb_id": show.tmdb_id, "title": show.title, "error": str(e)})
+            continue
+        seasons_refreshed = 0
+        for season in details.get("seasons", []):
+            if season["season_number"] == 0:
+                continue
+            await _cache_season(show, season["season_number"], db)
+            seasons_refreshed += 1
+        results.append({"tmdb_id": show.tmdb_id, "title": show.title, "seasons": seasons_refreshed})
+    return {"shows": len(shows), "results": results}
