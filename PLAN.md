@@ -177,15 +177,15 @@ Screenshot automation: `uv run python scripts/screenshot.py` (requires app runni
 - [x] If a guest, link to the specific episode (with background backfill on first visit)
 - [x] Fix Add to Library 500 Internal Server Error
 - [ ] Import old watchlists from Trakt
-- [ ] Mark a whole show as complete
-- [ ] "Mark Season Watched" can't handle a second watch (rewatch flow)
+- [x] Mark a whole show as complete
+- [x] "Mark Season Watched" can't handle a second watch (rewatch flow)
 - [ ] Identify episodes as show premiere, finale, season premiere, mid-season finale, season finale
 - [ ] Identify shows on hiatus (mid-season or between-season)
 - [ ] Mark an episode as dismissed. (probably won't watch it. no need to suggest it)
 - [ ] Links on person page
 - [x] All of the page titles are just WHIST so going back in my history isn't useful.
 - [ ] Shows on a people page that aren't in my library should link to TMDB
-- [ ] Mark an entire show or season as watched with no date
+- [x] Mark an entire show or season as watched with no date
 
 ## Out of Scope
 - Multiple user accounts

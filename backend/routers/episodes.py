@@ -196,6 +196,7 @@ async def get_show_progress(tmdb_show_id: int, db: Session = Depends(get_db)):
             models.Episode.watched == False,  # noqa: E712
         )
         .order_by(models.Episode.season_number, models.Episode.episode_number)
+        .limit(1)
     ).scalar_one_or_none()
 
     return {
@@ -263,6 +264,7 @@ class WatchedRequest(BaseModel):
 class BulkWatchedRequest(BaseModel):
     tmdb_show_id: int
     season_number: int | None = None  # None = entire show
+    watched: bool = True              # False to bulk-unwatch
     watched_at: str | None = "today"  # "today" | YYYY-MM-DD | null (no date)
 
 
@@ -340,7 +342,30 @@ async def mark_episode_watched(body: WatchedRequest, db: Session = Depends(get_d
 
 @router.post("/episodes/watched/bulk")
 def mark_bulk_watched(body: BulkWatchedRequest, db: Session = Depends(get_db)):
-    """Mark an entire season (or whole show) as watched."""
+    """Mark an entire season (or whole show) as watched or unwatched."""
+    if not body.watched:
+        # Bulk unwatch: clear all watch history and episode state
+        del_q = delete(models.WatchHistory).where(
+            models.WatchHistory.tmdb_show_id == body.tmdb_show_id
+        )
+        if body.season_number is not None:
+            del_q = del_q.where(models.WatchHistory.season_number == body.season_number)
+        db.execute(del_q)
+
+        ep_q = select(models.Episode).where(
+            models.Episode.tmdb_show_id == body.tmdb_show_id,
+            models.Episode.watched == True,  # noqa: E712
+        )
+        if body.season_number is not None:
+            ep_q = ep_q.where(models.Episode.season_number == body.season_number)
+        episodes = db.execute(ep_q).scalars().all()
+        for ep in episodes:
+            ep.watched = False
+            ep.watched_at = None
+
+        db.commit()
+        return {"marked": len(episodes)}
+
     query = select(models.Episode).where(
         models.Episode.tmdb_show_id == body.tmdb_show_id,
         models.Episode.watched == False,  # noqa: E712
