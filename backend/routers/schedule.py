@@ -96,6 +96,7 @@ async def get_schedule_today(db: Session = Depends(get_db)):
                 models.Episode.tmdb_show_id == show.tmdb_id,
                 models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
+                models.Episode.dismissed == False,  # noqa: E712
                 models.Episode.air_date.isnot(None),
                 models.Episode.air_date <= tod,
             )
@@ -139,6 +140,7 @@ async def get_schedule_today(db: Session = Depends(get_db)):
                 models.Episode.tmdb_show_id == show.tmdb_id,
                 models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
+                models.Episode.dismissed == False,  # noqa: E712
                 models.Episode.air_date.isnot(None),
                 models.Episode.air_date <= tod,
             )
@@ -153,6 +155,7 @@ async def get_schedule_today(db: Session = Depends(get_db)):
                 models.Episode.tmdb_show_id == show.tmdb_id,
                 models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
+                models.Episode.dismissed == False,  # noqa: E712
                 models.Episode.air_date.isnot(None),
                 models.Episode.air_date <= tod,
             )
@@ -184,6 +187,7 @@ async def get_schedule_today(db: Session = Depends(get_db)):
                 models.Episode.tmdb_show_id == show.tmdb_id,
                 models.Episode.season_number >= floor,
                 models.Episode.watched == False,  # noqa: E712
+                models.Episode.dismissed == False,  # noqa: E712
             )
             .order_by(models.Episode.season_number, models.Episode.episode_number)
             .limit(1)

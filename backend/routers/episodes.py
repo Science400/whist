@@ -474,6 +474,46 @@ def delete_history_entry(entry_id: int, db: Session = Depends(get_db)):
     return {"deleted": True, "watch_count": watch_count, "watched": ep.watched if ep else False}
 
 
+@router.post("/episodes/{tmdb_show_id}/{season_number}/{episode_number}/dismiss")
+def dismiss_episode(
+    tmdb_show_id: int, season_number: int, episode_number: int,
+    db: Session = Depends(get_db),
+):
+    """Mark an episode dismissed — excluded from the schedule without affecting watch history."""
+    ep = db.execute(
+        select(models.Episode).where(
+            models.Episode.tmdb_show_id == tmdb_show_id,
+            models.Episode.season_number == season_number,
+            models.Episode.episode_number == episode_number,
+        )
+    ).scalar_one_or_none()
+    if not ep:
+        raise HTTPException(status_code=404, detail="Episode not found")
+    ep.dismissed = True
+    db.commit()
+    return {"dismissed": True}
+
+
+@router.post("/episodes/{tmdb_show_id}/{season_number}/{episode_number}/undismiss")
+def undismiss_episode(
+    tmdb_show_id: int, season_number: int, episode_number: int,
+    db: Session = Depends(get_db),
+):
+    """Clear the dismissed flag on an episode."""
+    ep = db.execute(
+        select(models.Episode).where(
+            models.Episode.tmdb_show_id == tmdb_show_id,
+            models.Episode.season_number == season_number,
+            models.Episode.episode_number == episode_number,
+        )
+    ).scalar_one_or_none()
+    if not ep:
+        raise HTTPException(status_code=404, detail="Episode not found")
+    ep.dismissed = False
+    db.commit()
+    return {"dismissed": False}
+
+
 @router.post("/admin/refresh-episodes")
 async def refresh_all_episodes(db: Session = Depends(get_db)):
     """Re-cache episodes for every tracked show, filling gaps from TMDB.

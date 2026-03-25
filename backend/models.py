@@ -46,6 +46,7 @@ class Episode(Base):
     air_date = Column(String)
     watched = Column(Boolean, default=False, nullable=False)
     watched_at = Column(String)
+    dismissed = Column(Boolean, default=False, nullable=False)
 
     show = relationship("Show", back_populates="episodes")
 
