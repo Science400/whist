@@ -5,7 +5,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend import models
+from backend import models, tmdb
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
@@ -42,7 +42,7 @@ def _active_season_floor(db: Session, tmdb_show_id: int) -> int | None:
 
 
 @router.get("/today")
-def get_schedule_today(db: Session = Depends(get_db)):
+async def get_schedule_today(db: Session = Depends(get_db)):
     """
     Return a single ordered list of shows to watch today.
 
@@ -66,6 +66,49 @@ def get_schedule_today(db: Session = Depends(get_db)):
         )
         .values(user_status="abandoned")
     )
+    db.commit()
+
+    # Auto-return hiatus shows when TMDB has a next episode announced
+    hiatus_shows = db.execute(
+        select(models.Show).where(
+            models.Show.user_status == "hiatus",
+            models.Show.type == "tv",
+        )
+    ).scalars().all()
+    for show in hiatus_shows:
+        tmdb_data = await tmdb.get_show(show.tmdb_id)
+        if tmdb_data.get("next_episode_to_air"):
+            show.user_status = "airing"
+    if hiatus_shows:
+        db.commit()
+
+    # Auto-hiatus: for all airing TV shows, if caught up and TMDB has no next episode
+    for show in db.execute(
+        select(models.Show).where(
+            models.Show.user_status == "airing",
+            models.Show.type == "tv",
+        )
+    ).scalars().all():
+        floor = _active_season_floor(db, show.tmdb_id) or 1
+        caught_up = not db.execute(
+            select(models.Episode)
+            .where(
+                models.Episode.tmdb_show_id == show.tmdb_id,
+                models.Episode.season_number >= floor,
+                models.Episode.watched == False,  # noqa: E712
+                models.Episode.air_date.isnot(None),
+                models.Episode.air_date <= tod,
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        if not caught_up:
+            continue
+        tmdb_data = await tmdb.get_show(show.tmdb_id)
+        tmdb_status = tmdb_data.get("status", "")
+        if tmdb_status in ("Ended", "Canceled"):
+            show.user_status = "finished"
+        elif tmdb_status == "Returning Series" and not tmdb_data.get("next_episode_to_air"):
+            show.user_status = "hiatus"
     db.commit()
 
     airing_shows = db.execute(
