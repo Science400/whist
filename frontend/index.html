@@ -838,6 +838,7 @@
       links.push(`<a class="ext-link" href="https://www.rottentomatoes.com/search?search=${enc}" target="_blank" rel="noopener">↗ Rotten Tomatoes</a>`);
       return `<div class="ext-links">${links.join('')}</div>`;
     }
+    function setTitle(s) { document.title = s ? `${s} — WHIST` : 'WHIST'; }
     function today() { return new Date().toISOString().slice(0, 10); }
     function yesterday() { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
 
@@ -1159,6 +1160,7 @@
         return;
       }
 
+      setTitle('Schedule');
       var dailyCap = parseInt(localStorage.getItem('whist_daily_cap') || '5', 10) || 5;
 
       function schedCardHTML(item) {
@@ -1259,6 +1261,7 @@
         return;
       }
 
+      setTitle('Library');
       const totalTracked = shows.length + movies.length;
 
       // Render outer shell once — controls persist across re-renders
@@ -1419,6 +1422,7 @@
 
     // ── Page: Add Show/Movie ─────────────────────────────────────────────────
     async function pageAdd(app) {
+      setTitle('Add');
       app.innerHTML = `
         <div class="page">
           <div class="page-header">
@@ -1508,6 +1512,7 @@
         return;
       }
 
+      setTitle(detail.title);
       const years = detail.first_air_date
         ? (detail.last_air_date && detail.last_air_date !== detail.first_air_date
             ? `${detail.first_air_date}–${detail.last_air_date}` : detail.first_air_date)
@@ -1732,6 +1737,8 @@
         return;
       }
 
+      setTitle(`${detailData.title} — Season ${seasonNum}`);
+
       // Local mutable state so we can update rows without full re-fetch
       const epState = {};
       data.episodes.forEach(ep => { epState[ep.episode_number] = { watched: ep.watched, watched_at: ep.watched_at, watch_count: ep.watch_count || 0, title: ep.title }; });
@@ -1943,6 +1950,8 @@
         return;
       }
 
+      setTitle(`${detailData.title} — ${epCode(seasonNum, epNum)} ${ep.title}`);
+
       function rerender() { pageEpisode(app, tmdbId, seasonNum, epNum); }
 
       const tmdbEpUrl = `https://www.themoviedb.org/tv/${tmdbId}/season/${seasonNum}/episode/${epNum}`;
@@ -2119,6 +2128,7 @@
         return;
       }
 
+      setTitle(detail.title);
       const year = detail.release_date || '';
       const genres = (detail.genres || []).join(', ');
       const runtime = detail.runtime ? `${detail.runtime} min` : '';
@@ -2267,6 +2277,7 @@
       }
 
       const { person, main_cast, guest } = data;
+      setTitle(person.name);
       const allSeen = [...main_cast, ...guest];
 
       const mainHTML = main_cast.length ? `
@@ -2372,6 +2383,7 @@
 
     // ── Page: Settings ───────────────────────────────────────────────────────
     function pageSettings(app) {
+      setTitle('Settings');
       const services = ['Netflix','Hulu','Max','Apple TV+','Peacock','Paramount+','Disney+','Prime Video','Tubi','Crunchyroll','Shudder','MUBI'];
       const saved = JSON.parse(localStorage.getItem('whist_services')||'[]');
 
