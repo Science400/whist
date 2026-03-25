@@ -39,6 +39,9 @@ async def _cache_season(show: models.Show, season_number: int, db: Session) -> N
                 air_date=ep.get("air_date"),
                 watched=False,
             ))
+        else:
+            exists.title = ep.get("name")
+            exists.air_date = ep.get("air_date")
     db.commit()
 
 
