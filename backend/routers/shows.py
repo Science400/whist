@@ -11,7 +11,7 @@ from backend import tmdb
 
 router = APIRouter(prefix="/shows", tags=["shows"])
 
-_VALID_STATUSES = {"airing", "watching", "finished", "watchlist", "abandoned"}
+_VALID_STATUSES = {"airing", "watching", "finished", "watchlist", "abandoned", "hiatus"}
 _VALID_PACES    = {"binge", "fast", "weekly"}
 
 
