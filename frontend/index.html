@@ -754,8 +754,8 @@
       add:      'var(--red)',
       settings: 'var(--red)',
     };
-    const STATUS_LABEL = { airing: 'Airing', watching: 'Watching', finished: 'Finished', watchlist: 'Watchlist', abandoned: 'Abandoned' };
-    const STATUS_COLOR = { airing: 'var(--orange)', watching: 'var(--yellow)', finished: 'var(--cyan)', watchlist: 'var(--blue)', abandoned: 'var(--muted)' };
+    const STATUS_LABEL = { airing: 'Airing', watching: 'Watching', hiatus: 'On Hiatus', finished: 'Finished', watchlist: 'Watchlist', abandoned: 'Abandoned' };
+    const STATUS_COLOR = { airing: 'var(--orange)', watching: 'var(--yellow)', hiatus: 'var(--purple)', finished: 'var(--cyan)', watchlist: 'var(--blue)', abandoned: 'var(--muted)' };
 
     // ── Router ───────────────────────────────────────────────────────────────
     function navigate(path) { history.pushState({}, '', path); render(); }
@@ -1291,8 +1291,8 @@
       const countEl     = app.querySelector('#lib-count');
 
       const segCache = {}; // tmdb_id -> segBarHTML string ('' if no episodes)
-      const order = ['airing', 'watching', 'finished', 'watchlist', 'abandoned'];
-      const sectionColors = { airing: 'var(--orange)', watching: 'var(--yellow)', finished: 'var(--cyan)', watchlist: 'var(--blue)', abandoned: 'var(--muted)' };
+      const order = ['airing', 'watching', 'hiatus', 'finished', 'watchlist', 'abandoned'];
+      const sectionColors = { airing: 'var(--orange)', watching: 'var(--yellow)', hiatus: 'var(--purple)', finished: 'var(--cyan)', watchlist: 'var(--blue)', abandoned: 'var(--muted)' };
 
       function renderGrid() {
         const q  = searchInput.value.toLowerCase().trim();
@@ -1331,7 +1331,7 @@
         }
 
         // Group shows into status sections
-        const groups = { airing: [], watching: [], finished: [], watchlist: [], abandoned: [] };
+        const groups = { airing: [], watching: [], hiatus: [], finished: [], watchlist: [], abandoned: [] };
         sortedShows.forEach(function(s) {
           (groups[s.user_status] ? groups[s.user_status] : groups.watching).push(s);
         });
@@ -1521,7 +1521,7 @@
           <h3>Add to Library</h3>
           <p>Choose a status to start tracking</p>
           <div class="add-status-row">
-            ${Object.entries(STATUS_LABEL).map(([k,v]) =>
+            ${Object.entries(STATUS_LABEL).filter(([k]) => k !== 'hiatus').map(([k,v]) =>
               `<button class="add-status-opt ${k==='airing'?'selected':''}" data-status="${k}">${v}</button>`
             ).join('')}
           </div>
